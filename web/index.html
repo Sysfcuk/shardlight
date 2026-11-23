@@ -92,24 +92,20 @@
 </head>
 <body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
-  <!-- side icons: a ruby and a sapphire, cut gems seen from the side -->
+  <!-- side icons: a ruby crystal cluster and a sapphire blob -->
   <symbol id="i-bee" viewBox="0 0 40 40">
-    <path d="M8 15 L14 8 H26 L32 15 L20 34 Z" fill="#d3123a"/>
-    <path d="M8 15 H32 L20 34 Z" fill="#a50c2c"/>
-    <path d="M14 8 L17 15 H23 L26 8 Z" fill="#ff7a93"/>
-    <path d="M8 15 L14 8 L17 15 Z M32 15 L26 8 L23 15 Z" fill="#ff3d62"/>
-    <path d="M17 15 L20 34 L23 15 Z" fill="#e8264d"/>
-    <path d="M8 15 L14 8 H26 L32 15 L20 34 Z" fill="none" stroke="#ffd0da" stroke-width="1.2" stroke-linejoin="round" opacity=".7"/>
+    <path d="M10 33 L30 33 L27 37 L13 37 Z" fill="#5a4a5e"/>
+    <path d="M17 33 L17 12 L20 4 L23 12 L23 33 Z" fill="#e8264d"/><path d="M20 4 L23 12 L23 33 L20 33 Z" fill="#a50c2c"/>
+    <path d="M12 33 L7 19 L8 14 L12 18 L16 31 Z" fill="#ff3d62"/><path d="M8 14 L12 18 L16 31 L13 33 Z" fill="#c8123a"/>
+    <path d="M28 33 L32 21 L33 15 L29 19 L24 31 Z" fill="#d3123a"/><path d="M33 15 L29 19 L24 31 L27 33 Z" fill="#8f0a26"/>
+    <path d="M20 4 L17 12 L19 12 Z" fill="#ffc2cf"/>
   </symbol>
   <symbol id="i-wasp" viewBox="0 0 40 40">
-    <path d="M8 15 L14 8 H26 L32 15 L20 34 Z" fill="#1d4fd6"/>
-    <path d="M8 15 H32 L20 34 Z" fill="#163aa3"/>
-    <path d="M14 8 L17 15 H23 L26 8 Z" fill="#8fb4ff"/>
-    <path d="M8 15 L14 8 L17 15 Z M32 15 L26 8 L23 15 Z" fill="#3f7bff"/>
-    <path d="M17 15 L20 34 L23 15 Z" fill="#2c62f0"/>
-    <path d="M8 15 L14 8 H26 L32 15 L20 34 Z" fill="none" stroke="#d6e3ff" stroke-width="1.2" stroke-linejoin="round" opacity=".7"/>
-  </symbol>
-</svg><canvas id="view"></canvas>
+    <path d="M20 5 C26 12 34 18 34 26 C34 33 28 36 20 36 C12 36 6 33 6 26 C6 18 14 12 20 5 Z" fill="#1f5ae6"/>
+    <path d="M20 5 C26 12 34 18 34 26 C34 33 28 36 20 36 C26 33 29 28 28 22 C27 16 23 11 20 5 Z" fill="#163aa3"/>
+    <ellipse cx="14" cy="21" rx="3" ry="5" fill="#cfe0ff" opacity=".85" transform="rotate(-20 14 21)"/>
+    <circle cx="25" cy="29" r="1.6" fill="#9fc0ff" opacity=".8"/>
+  </symbol></svg><canvas id="view"></canvas>
 
 <section id="title" class="layer">
   <div class="brand">
@@ -165,10 +161,10 @@
 <div id="howto" class="sheet hidden"><div class="card">
   <h3>How to play</h3>
   <ul>
-    <li><b>Tap one of your gems</b>, then a glowing cell.</li>
-    <li><b>Green, next door:</b> your gem splits, and a copy grows there.</li>
+    <li><b>Tap one of your pieces</b>, then a glowing cell. Rubies are crystal clusters; sapphires are molten blobs.</li>
+    <li><b>Green, next door:</b> your piece splits, and a copy grows there.</li>
     <li><b>Violet, two away:</b> it leaps there and leaves its old cell empty.</li>
-    <li>Every enemy gem <b>touching the cell you land on</b> changes colour to yours.</li>
+    <li>Every enemy piece <b>touching the cell you land on</b> turns into one of yours.</li>
     <li>If a side can't move, the game ends and the other side takes every empty cell. <b>Most cells wins.</b></li>
     <li>Drag to turn and tilt the board, pinch to zoom. The ⊕ button straightens it again.</li>
     <li>Tap during an animation to speed it up.</li>

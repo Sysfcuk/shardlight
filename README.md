@@ -34,10 +34,12 @@ Drag to turn and tilt the board, pinch to zoom out and see the cavern.
 
 ## The look
 
-- **Gems:** an eight-facet brilliant cut, flat shaded so every facet catches light. On desktop
-  they're real refractive crystal (transmission, index of refraction 1.77, a little dispersion for
-  fire); on phones, a cheaper glossy glowing stone that reads the same at a glance.
-- **Captures:** a captured gem tumbles end over end and changes colour half way round.
+- **Two opposite shapes:** rubies are jagged crystal clusters (a tall spire and shards bursting out
+  at angles, flat shaded so every facet catches light); sapphires are wobbling blobs of molten
+  sapphire, glossy with an oily thin-film sheen. A vertex shader ripples and breathes each blob on
+  its own rhythm. On desktop both are refractive (transmission, a little dispersion on the
+  crystals); phones get cheaper glossy, glowing versions that read the same at a glance.
+- **Captures:** a captured piece tumbles end over end and changes side half way round.
 - **Board:** polished dark stone cells that glow ruby or sapphire underneath whoever owns them.
 - **The cavern:** a skylight's shaft of daylight on the board with drifting dust, glowing crystal
   clusters (with coloured lights) on the floor, walls and floating rocks, stalactites and
@@ -54,7 +56,7 @@ Drag to turn and tilt the board, pinch to zoom out and see the cavern.
 | `src/bin/selfplay.rs` | Pits the difficulty levels against each other. |
 | `web/engine.js` | Loads `shardlight.wasm`; runs the AI in a Web Worker (`ai.worker.js`). |
 | `web/scene.js` | Board, gems, camera (orbit, tilt, pinch zoom), animations, bloom and tilt-shift. |
-| `web/models.js` | The gem cut and its materials. |
+| `web/models.js` | The crystal cluster and the blob, and their materials (the blob's wobble shader). |
 | `web/world.js` | The cavern: dome, spikes, crystals and their lights, floating rocks, lake, skylight shaft, dust. |
 | `web/swarm.js` | The wisps (boids flocking). |
 | `web/main.js` | Screens, turns, input, undo, hints, glassy chime sounds (a tiny synth, no audio files). |

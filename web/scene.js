@@ -5,7 +5,7 @@
 // board is a handful of draw calls no matter how many pieces are on it.
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { gemGeometry, gemMaterial, wispGeometry } from './models.js';
+import { crystalClusterGeometry, blobGeometry, crystalMaterial, blobMaterial, wispGeometry } from './models.js';
 import { createWorld, CRYSTAL_COLORS } from './world.js';
 import { createSwarm } from './swarm.js';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
@@ -122,10 +122,10 @@ export function createScene(canvas, { mobile = false } = {}) {
   const glowMat = new THREE.MeshBasicMaterial({ map: glowTex, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false });
   const ringGeo = new THREE.RingGeometry(S * 0.42, S * 0.56, 40); ringGeo.rotateX(-Math.PI / 2);
   const ringMat = new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.9, depthWrite: false });
-  // the gems: refractive crystal on desktop, glossy glowing stone on phones
-  const rubyMat = gemMaterial('#e0143c', { rich: !mobile });
-  const sapphireMat = gemMaterial('#1f5ae6', { rich: !mobile });
-  const GEO = { gem: gemGeometry(8) };
+  // rubies are jagged crystal clusters; sapphires are wobbling blobs of molten sapphire
+  const rubyMat = crystalMaterial('#e0143c', { rich: !mobile });
+  const sapphireMat = blobMaterial('#1f5ae6', { rich: !mobile });
+  const GEO = { ruby: crystalClusterGeometry(), sapphire: blobGeometry() };
   // glowing wisps drift round the cavern (boids), and gather at the sapphire rock now and then
   const wispMat = new THREE.MeshBasicMaterial({ color: '#ffffff', toneMapped: false });
   const swarm = createSwarm(scene, { count: mobile ? 18 : 32, bodyGeo: wispGeometry(), bodyMat: wispMat, home: world.homePos, scale: 0.22, maxSpeed: 2.4, lift: 0,
@@ -198,8 +198,8 @@ export function createScene(canvas, { mobile = false } = {}) {
       cells: new THREE.InstancedMesh(cellGeo, cellMat, n),
       glow: new THREE.InstancedMesh(glowGeo, glowMat, n),
       rings: new THREE.InstancedMesh(ringGeo, ringMat, 24),
-      ruby: new THREE.InstancedMesh(GEO.gem, rubyMat, cap),
-      sapphire: new THREE.InstancedMesh(GEO.gem, sapphireMat, cap),
+      ruby: new THREE.InstancedMesh(GEO.ruby, rubyMat, cap),
+      sapphire: new THREE.InstancedMesh(GEO.sapphire, sapphireMat, cap),
     };
     meshes.cells.receiveShadow = true;
     for (const k of ['ruby', 'sapphire']) meshes[k].castShadow = true;
@@ -513,7 +513,7 @@ export function createScene(canvas, { mobile = false } = {}) {
   }
 
   /** Pose a gem: hovering at height y, turning (yaw), and tumbling end over end (tumble, radians). */
-  const GEM_SIZE = 1.22;
+  const GEM_SIZE = 1.12;
   function gemMatrix(out, x, y, z, yaw, tumble, s) {
     E.set(tumble, yaw, 0, 'YXZ'); Q.setFromEuler(E);
     // tumble about the gem's middle, not its point
@@ -613,6 +613,7 @@ export function createScene(canvas, { mobile = false } = {}) {
       meshes.ruby.count = nr; meshes.sapphire.count = ns;
       meshes.ruby.instanceMatrix.needsUpdate = meshes.sapphire.instanceMatrix.needsUpdate = true;
     }
+    sapphireMat.userData.tick(clockT); // the blobs wobble
     stepParticles(dt);
     world.update(clockT, rdt);
     swarm.update(Math.min(dt, 0.033), clockT);
