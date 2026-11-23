@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
 <meta name="theme-color" content="#0b0d18">
-<meta name="description" content="Shardlight: rubies vs sapphires on a stone board deep in a crystal cavern.">
+<meta name="description" content="Shardlight: shards vs blobs on a stone board deep in a crystal cavern.">
 <title>Shardlight</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
@@ -18,7 +18,7 @@
 <style>
   :root {
     --ink: #e8ecff; --ink-2: #a9b2d6; --card: rgba(22, 26, 46, .88); --edge: rgba(150, 170, 255, .22);
-    --ruby: #ff2d55; --sapph: #3d7bff; --glow: #8fe9ff;
+    --ruby: #b45cff; --sapph: #38d65e; --glow: #8fe9ff;
     --gold: linear-gradient(180deg, #ffe7a6, #f1b54a 55%, #c9822a);
     --safe-t: env(safe-area-inset-top, 0px); --safe-b: env(safe-area-inset-bottom, 0px);
   }
@@ -53,13 +53,13 @@
   .ico { width: 30px; height: 30px; display: block; }
   #result .ico { width: 40px; height: 40px; }
   .pill .who { width: 38px; height: 38px; border-radius: 12px; display: grid; place-items: center; flex: none; }
-  .pill.bee .who { background: rgba(255, 45, 85, .16); } .pill.wasp .who { background: rgba(61, 123, 255, .18); }
+  .pill.bee .who { background: rgba(180, 92, 255, .18); } .pill.wasp .who { background: rgba(56, 214, 94, .16); }
   .pill .name { font-size: 12px; font-weight: 700; color: var(--ink-2); line-height: 1.05; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .pill .n { font-size: 26px; font-weight: 800; line-height: 1; }
   .pill .txt { min-width: 0; flex: 1; }
   .pill.on { transform: translateY(-2px) scale(1.03); }
-  .pill.bee.on { box-shadow: 0 0 0 2px var(--ruby), 0 0 22px rgba(255, 45, 85, .55); }
-  .pill.wasp.on { box-shadow: 0 0 0 2px var(--sapph), 0 0 22px rgba(61, 123, 255, .6); }
+  .pill.bee.on { box-shadow: 0 0 0 2px var(--ruby), 0 0 22px rgba(180, 92, 255, .6); }
+  .pill.wasp.on { box-shadow: 0 0 0 2px var(--sapph), 0 0 22px rgba(56, 214, 94, .55); }
   .icon-btn { width: 46px; height: 46px; border-radius: 14px; display: grid; place-items: center; flex: none; }
   .icon-btn svg { width: 22px; height: 22px; }
   #status { align-self: center; margin-top: 8px; background: rgba(10, 12, 26, .75); border: 1px solid var(--edge); color: var(--ink); padding: 6px 14px; border-radius: 99px; font-size: 15px; font-weight: 700; transition: opacity .3s; }
@@ -92,25 +92,26 @@
 </head>
 <body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
-  <!-- side icons: a ruby crystal cluster and a sapphire blob -->
+  <!-- side icons: a many-coloured shard cluster and a green jelly blob -->
   <symbol id="i-bee" viewBox="0 0 40 40">
-    <path d="M10 33 L30 33 L27 37 L13 37 Z" fill="#5a4a5e"/>
-    <path d="M17 33 L17 12 L20 4 L23 12 L23 33 Z" fill="#e8264d"/><path d="M20 4 L23 12 L23 33 L20 33 Z" fill="#a50c2c"/>
-    <path d="M12 33 L7 19 L8 14 L12 18 L16 31 Z" fill="#ff3d62"/><path d="M8 14 L12 18 L16 31 L13 33 Z" fill="#c8123a"/>
-    <path d="M28 33 L32 21 L33 15 L29 19 L24 31 Z" fill="#d3123a"/><path d="M33 15 L29 19 L24 31 L27 33 Z" fill="#8f0a26"/>
-    <path d="M20 4 L17 12 L19 12 Z" fill="#ffc2cf"/>
+    <path d="M10 33 L30 33 L27 37 L13 37 Z" fill="#4a4060"/>
+    <path d="M17 33 L17 12 L20 4 L23 12 L23 33 Z" fill="#ff2d55"/><path d="M20 4 L23 12 L23 33 L20 33 Z" fill="#b8123a"/>
+    <path d="M12 33 L7 19 L8 14 L12 18 L16 31 Z" fill="#ffb02e"/><path d="M8 14 L12 18 L16 31 L13 33 Z" fill="#c97c10"/>
+    <path d="M28 33 L32 21 L33 15 L29 19 L24 31 Z" fill="#3d8bff"/><path d="M33 15 L29 19 L24 31 L27 33 Z" fill="#1f56c8"/>
+    <path d="M22 33 L26 26 L29 24 L27 29 Z" fill="#35e08a"/><path d="M18 33 L14 27 L11 25 L13 30 Z" fill="#b45cff"/>
+    <path d="M20 4 L17 12 L19 12 Z" fill="#ffd0da"/>
   </symbol>
   <symbol id="i-wasp" viewBox="0 0 40 40">
-    <path d="M20 5 C26 12 34 18 34 26 C34 33 28 36 20 36 C12 36 6 33 6 26 C6 18 14 12 20 5 Z" fill="#1f5ae6"/>
-    <path d="M20 5 C26 12 34 18 34 26 C34 33 28 36 20 36 C26 33 29 28 28 22 C27 16 23 11 20 5 Z" fill="#163aa3"/>
-    <ellipse cx="14" cy="21" rx="3" ry="5" fill="#cfe0ff" opacity=".85" transform="rotate(-20 14 21)"/>
-    <circle cx="25" cy="29" r="1.6" fill="#9fc0ff" opacity=".8"/>
+    <path d="M20 7 C27 9 34 16 34 25 C34 32 28 35 20 35 C12 35 6 32 6 25 C6 16 13 9 20 7 Z" fill="#38d65e"/>
+    <path d="M34 25 C34 32 28 35 20 35 C12 35 6 32 6 25 C10 30 30 30 34 25 Z" fill="#1f9e42"/>
+    <ellipse cx="14" cy="17" rx="3.4" ry="4.6" fill="#e2ffe8" opacity=".85" transform="rotate(-25 14 17)"/>
+    <circle cx="26" cy="27" r="1.8" fill="#b6ffbf" opacity=".85"/><circle cx="22" cy="31" r="1" fill="#b6ffbf" opacity=".7"/>
   </symbol></svg><canvas id="view"></canvas>
 
 <section id="title" class="layer">
   <div class="brand">
     <h1>Shardlight</h1>
-    <p>Rubies against sapphires, deep in the crystal caves.</p>
+    <p>Shards against blobs, deep in the crystal caves.</p>
   </div>
   <div class="actions">
     <button class="big" id="btn-play">Play</button>
@@ -123,8 +124,8 @@
   <div>
     <div id="scores">
       <button class="icon-btn glass" id="btn-menu" aria-label="Menu"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
-      <div class="pill bee glass" id="pill-bee"><span class="who"><svg class="ico" viewBox="0 0 40 40"><use href="#i-bee"/></svg></span><span class="txt"><span class="name" id="name-bee">Rubies</span><br><span class="n" id="n-bee">3</span></span></div>
-      <div class="pill wasp glass" id="pill-wasp"><span class="who"><svg class="ico" viewBox="0 0 40 40"><use href="#i-wasp"/></svg></span><span class="txt"><span class="name" id="name-wasp">Sapphires</span><br><span class="n" id="n-wasp">3</span></span></div>
+      <div class="pill bee glass" id="pill-bee"><span class="who"><svg class="ico" viewBox="0 0 40 40"><use href="#i-bee"/></svg></span><span class="txt"><span class="name" id="name-bee">Shards</span><br><span class="n" id="n-bee">3</span></span></div>
+      <div class="pill wasp glass" id="pill-wasp"><span class="who"><svg class="ico" viewBox="0 0 40 40"><use href="#i-wasp"/></svg></span><span class="txt"><span class="name" id="name-wasp">Blobs</span><br><span class="n" id="n-wasp">3</span></span></div>
     </div>
     <div style="display:flex;justify-content:center;align-items:center;gap:8px"><span id="status">Your move</span>
       <button class="icon-btn glass hidden" id="btn-view" aria-label="Recentre the board" style="width:36px;height:36px;border-radius:12px;margin-top:8px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg></button></div>
@@ -144,7 +145,7 @@
     <div class="label">Difficulty</div>
     <div class="seg" data-key="level"><button data-v="0">Easy</button><button data-v="1">Medium</button><button data-v="2">Hard</button><button data-v="3">Expert</button></div>
     <div class="label">You play</div>
-    <div class="seg" data-key="side"><button data-v="0">Rubies (go first)</button><button data-v="1">Sapphires</button></div>
+    <div class="seg" data-key="side"><button data-v="0">Shards (go first)</button><button data-v="1">Blobs</button></div>
   </div>
   <div class="label">Board</div>
   <div class="seg" data-key="layout"><button data-v="0">Classic</button><button data-v="1">Quick</button><button data-v="2">Open</button><button data-v="3">Flower</button></div>
@@ -161,13 +162,13 @@
 <div id="howto" class="sheet hidden"><div class="card">
   <h3>How to play</h3>
   <ul>
-    <li><b>Tap one of your pieces</b>, then a glowing cell. Rubies are crystal clusters; sapphires are molten blobs.</li>
+    <li><b>Tap one of your pieces</b>, then a glowing cell. Shards are many-coloured crystal clusters; blobs are living jelly.</li>
     <li><b>Green, next door:</b> your piece splits, and a copy grows there.</li>
     <li><b>Violet, two away:</b> it leaps there and leaves its old cell empty.</li>
     <li>Every enemy piece <b>touching the cell you land on</b> turns into one of yours.</li>
     <li>If a side can't move, the game ends and the other side takes every empty cell. <b>Most cells wins.</b></li>
     <li>Drag to turn and tilt the board, pinch to zoom. The ⊕ button straightens it again.</li>
-    <li>Tap during an animation to speed it up.</li>
+    <li>Captures come with a random flourish: lightning, a shockwave, shattering, a goo splash or crystals bursting through.</li>
   </ul>
   <div class="row"><button class="go" id="howto-ok">Got it</button></div>
 </div></div>

@@ -29,6 +29,17 @@ const sfx = (() => {
     o.connect(g).connect(a.destination); o.start(t); o.stop(t + dur + 0.02);
   }
   const SCALE = [523, 587, 659, 784, 880, 1047, 1175, 1319, 1568];
+  // filtered white noise: crackles, thumps and tinkles
+  function noise(dur, freq, vol) {
+    if (!save.sound) return;
+    const a = ctx(), t = a.currentTime, len = Math.ceil(a.sampleRate * dur);
+    const buf = a.createBuffer(1, len, a.sampleRate), d = buf.getChannelData(0);
+    for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * (Math.random() < 0.3 ? 1 : 0.3);
+    const src = a.createBufferSource(), f = a.createBiquadFilter(), g = a.createGain();
+    src.buffer = buf; f.type = 'bandpass'; f.frequency.value = freq; f.Q.value = 0.8;
+    g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+    src.connect(f).connect(g).connect(a.destination); src.start(t);
+  }
   // a glassy bell: a pure tone plus a quieter, slightly sharp overtone, with a long fade
   const chime = (f, delay = 0, vol = 0.1) => { tone(f, 0.9, { vol, delay }); tone(f * 2.76, 0.5, { vol: vol * 0.35, delay }); };
   return {
@@ -39,6 +50,14 @@ const sfx = (() => {
     land() { chime(880, 0, 0.09); tone(140, 0.15, { vol: 0.12, slide: -60 }); },
     flip(side, k) { chime(SCALE[Math.min(k, 8)] * (side ? 1.5 : 1), 0, 0.08); },
     fill(k) { chime(1047 + (k % 8) * 90, 0, 0.03); },
+    // takeover effects
+    effect(name) {
+      if (name === 'zap') { noise(0.22, 2400, 0.16); tone(90, 0.25, { type: 'sawtooth', vol: 0.05, slide: -40 }); }
+      else if (name === 'shatter') { noise(0.18, 5200, 0.1); [1568, 2093, 2637].forEach((f, k) => tone(f, 0.25, { vol: 0.03, delay: k * 0.03 })); }
+      else if (name === 'splash') { tone(220, 0.22, { vol: 0.12, slide: -120 }); tone(330, 0.12, { vol: 0.06, slide: 200, delay: 0.05 }); }
+      else if (name === 'crystal') { [1319, 1760, 2349].forEach((f, k) => chime(f, k * 0.04, 0.05)); }
+      else if (name === 'shockwave') { tone(70, 0.6, { vol: 0.14, slide: -30 }); noise(0.4, 600, 0.05); }
+    },
     win() { [0, 2, 4, 7, 8].forEach((n, k) => chime(SCALE[n], k * 0.12, 0.1)); },
     lose() { tone(330, 0.3, { type: 'triangle', vol: 0.1, slide: -100 }); tone(247, 0.45, { type: 'triangle', vol: 0.1, slide: -80, delay: 0.22 }); },
   };
@@ -59,7 +78,7 @@ let screen = 'title';
 
 const pieces = () => Array.from({ length: G.n }, (_, i) => E.piece(i));
 const isHuman = (side) => G.mode === 'local' || side === G.human;
-const SIDE_NAME = ['Rubies', 'Sapphires'];
+const SIDE_NAME = ['Shards', 'Blobs'];
 
 function newGame({ layout, mode, level, human, demo = false }) {
   const cells = E.newGame(layout);
@@ -80,9 +99,9 @@ function updateHud() {
   $('#pill-bee').classList.toggle('on', E.winner < 0 && turn === 0);
   $('#pill-wasp').classList.toggle('on', E.winner < 0 && turn === 1);
   if (G.mode === 'ai') {
-    $('#name-bee').textContent = G.human === 0 ? 'You' : `Rubies · ${LEVELS[G.level]}`;
-    $('#name-wasp').textContent = G.human === 1 ? 'You' : `Sapphires · ${LEVELS[G.level]}`;
-  } else { $('#name-bee').textContent = 'Rubies'; $('#name-wasp').textContent = 'Sapphires'; }
+    $('#name-bee').textContent = G.human === 0 ? 'You' : `Shards · ${LEVELS[G.level]}`;
+    $('#name-wasp').textContent = G.human === 1 ? 'You' : `Blobs · ${LEVELS[G.level]}`;
+  } else { $('#name-bee').textContent = 'Shards'; $('#name-wasp').textContent = 'Blobs'; }
   let status = '';
   if (E.winner >= 0) status = '';
   else if (G.mode === 'local') status = `${SIDE_NAME[turn]} to move`;

@@ -29,13 +29,25 @@ function shard(h, r) {
   return [prep(body), prep(tip)];
 }
 
-/** The ruby crystal cluster. */
+/** Each shard in a cluster is a different gemstone: ruby, amber, emerald, amethyst, sapphire, rose, topaz. */
+export const SHARD_COLORS = ['#ff2d55', '#ffb02e', '#35e08a', '#b45cff', '#3d8bff', '#ff6ec7', '#ffe14a'];
+
+function paint(g, color) {
+  const c = new THREE.Color(color), n = g.attributes.position.count, a = new Float32Array(n * 3);
+  for (let i = 0; i < n; i++) { a[i * 3] = c.r; a[i * 3 + 1] = c.g; a[i * 3 + 2] = c.b; }
+  g.setAttribute('color', new THREE.BufferAttribute(a, 3));
+  return g;
+}
+
+/** The shard cluster: every crystal in it a different colour. */
 export function crystalClusterGeometry() {
   const parts = [];
+  let k = 0;
   const place = (h, r, tilt, yaw, x, z) => {
+    const color = SHARD_COLORS[k++ % SHARD_COLORS.length];
     for (const g of shard(h, r)) {
       g.rotateZ(tilt); g.rotateY(yaw); g.translate(x, 0.06, z);
-      parts.push(g);
+      parts.push(paint(g, color));
     }
   };
   place(0.78, 0.15, 0.05, 0.3, 0, 0);                    // the tall central spire
@@ -45,10 +57,10 @@ export function crystalClusterGeometry() {
   place(0.36, 0.085, 0.78, 1.2, 0.02, 0.08);
   place(0.32, 0.08, 0.82, 3.3, -0.06, -0.01);
   place(0.3, 0.075, 0.88, 5.3, 0.05, -0.07);
-  // a rough chip of rock it grows from
+  // a rough chip of dark rock it grows from
   const chip = prep(new THREE.DodecahedronGeometry(0.2, 0));
   chip.scale(1.25, 0.45, 1.15); chip.translate(0, 0.05, 0);
-  parts.push(chip);
+  parts.push(paint(chip, '#3a3550'));
   const g = mergeGeometries(parts);
   // chunkier than the raw shards, so a cluster carries the same weight on the board as a blob
   g.scale(1.35, 1.05, 1.35);
@@ -86,19 +98,18 @@ export function wispGeometry() { return new THREE.IcosahedronGeometry(0.3, 1); }
  * Crystal material. Desktop: real refraction (transmission) with a little dispersion for fire.
  * Phones: no transmission pass; a glossy, softly glowing stone that reads the same at a glance.
  */
-export function crystalMaterial(color, { rich = true } = {}) {
-  const c = new THREE.Color(color);
-  if (rich) {
-    return new THREE.MeshPhysicalMaterial({
-      color: c, roughness: 0.04, metalness: 0, transmission: 0.62, thickness: 0.6, ior: 1.77, dispersion: 0.4,
-      attenuationColor: c, attenuationDistance: 0.3, specularIntensity: 1, clearcoat: 1, clearcoatRoughness: 0.03,
-      emissive: c, emissiveIntensity: 0.32, flatShading: true, envMapIntensity: 1.7,
-    });
-  }
-  return new THREE.MeshPhysicalMaterial({
-    color: c, roughness: 0.08, metalness: 0.15, clearcoat: 1, clearcoatRoughness: 0.05, emissive: c, emissiveIntensity: 0.34,
-    flatShading: true, envMapIntensity: 1.8,
-  });
+export function crystalMaterial({ rich = true } = {}) {
+  // colour comes from each shard's vertex colours; the glow is tinted by them too
+  const m = new THREE.MeshPhysicalMaterial(rich
+    ? { color: '#ffffff', vertexColors: true, roughness: 0.04, metalness: 0, transmission: 0.55, thickness: 0.6, ior: 1.77, dispersion: 0.45,
+        specularIntensity: 1, clearcoat: 1, clearcoatRoughness: 0.03, emissive: '#ffffff', emissiveIntensity: 0.3, flatShading: true, envMapIntensity: 1.7 }
+    : { color: '#ffffff', vertexColors: true, roughness: 0.08, metalness: 0.15, clearcoat: 1, clearcoatRoughness: 0.05, emissive: '#ffffff', emissiveIntensity: 0.32,
+        flatShading: true, envMapIntensity: 1.8 });
+  m.onBeforeCompile = (sh) => {
+    sh.fragmentShader = sh.fragmentShader.replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\ntotalEmissiveRadiance *= vColor.rgb;');
+  };
+  m.customProgramCacheKey = () => 'shard-crystal' + (rich ? '-rich' : '');
+  return m;
 }
 
 /**
@@ -125,13 +136,12 @@ export function blobMaterial(color, { rich = true } = {}) {
           seed = instanceMatrix[3].x * 1.7 + instanceMatrix[3].z * 2.3;
         #endif
         float t = uTime;
-        float breathe = sin(t * 2.3 + seed);
-        transformed.y = (transformed.y - 0.02) * (1.0 + 0.06 * breathe) + 0.02;
-        transformed.xz *= 1.0 - 0.03 * breathe;
+        // the big squash and stretch comes from the jelly simulation (jelly.js) through the
+        // instance matrix; this adds only the fine surface ripple on top
         float ripple = sin(position.x * 11.0 + t * 2.6 + seed) * sin(position.y * 9.0 + t * 1.9) * sin(position.z * 10.0 + t * 3.1 + seed * 0.7);
         transformed += normalize(objectNormal) * ripple * 0.022 * smoothstep(0.03, 0.12, position.y);`);
   };
-  m.customProgramCacheKey = () => 'sapphire-blob' + (rich ? '-rich' : '');
+  m.customProgramCacheKey = () => 'jelly-blob' + (rich ? '-rich' : '');
   m.userData.tick = (t) => { uniforms.uTime.value = t; };
   return m;
 }

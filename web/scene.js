@@ -5,7 +5,9 @@
 // board is a handful of draw calls no matter how many pieces are on it.
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { crystalClusterGeometry, blobGeometry, crystalMaterial, blobMaterial, wispGeometry } from './models.js';
+import { crystalClusterGeometry, blobGeometry, crystalMaterial, blobMaterial, wispGeometry, SHARD_COLORS } from './models.js';
+import { Jelly } from './jelly.js';
+import { createFx } from './fx.js';
 import { createWorld, CRYSTAL_COLORS } from './world.js';
 import { createSwarm } from './swarm.js';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
@@ -37,9 +39,9 @@ const REST_YAW = -Math.PI / 2;
 
 const COLORS = {
   stone: new THREE.Color('#3b4157'),
-  rubyCell: new THREE.Color('#6b1c2e'), sapphireCell: new THREE.Color('#1d3570'),
+  rubyCell: new THREE.Color('#4a2a6e'), sapphireCell: new THREE.Color('#1d5a34'),
   // glows are added on top of the stone and pushed past white so the bloom picks them up
-  rubyGlow: new THREE.Color('#ff1e4a').multiplyScalar(0.9), sapphireGlow: new THREE.Color('#2a6bff').multiplyScalar(0.9),
+  rubyGlow: new THREE.Color('#b45cff').multiplyScalar(0.9), sapphireGlow: new THREE.Color('#2bea6a').multiplyScalar(0.8),
   buzz: new THREE.Color('#5dffb4'), fly: new THREE.Color('#c08cff'), hint: new THREE.Color('#ffc23a'), last: new THREE.Color('#ffffff'),
 };
 
@@ -123,8 +125,10 @@ export function createScene(canvas, { mobile = false } = {}) {
   const ringGeo = new THREE.RingGeometry(S * 0.42, S * 0.56, 40); ringGeo.rotateX(-Math.PI / 2);
   const ringMat = new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.9, depthWrite: false });
   // rubies are jagged crystal clusters; sapphires are wobbling blobs of molten sapphire
-  const rubyMat = crystalMaterial('#e0143c', { rich: !mobile });
-  const sapphireMat = blobMaterial('#1f5ae6', { rich: !mobile });
+  const rubyMat = crystalMaterial({ rich: !mobile });
+  const sapphireMat = blobMaterial('#38d65e', { rich: !mobile });
+  const fx = createFx(scene, { mobile });
+  let lastEffect = null, forcedEffect = null; // forcedEffect: for testing one effect at a time
   const GEO = { ruby: crystalClusterGeometry(), sapphire: blobGeometry() };
   // glowing wisps drift round the cavern (boids), and gather at the sapphire rock now and then
   const wispMat = new THREE.MeshBasicMaterial({ color: '#ffffff', toneMapped: false });
@@ -444,7 +448,19 @@ export function createScene(canvas, { mobile = false } = {}) {
 
   // ---------------------------------------------------------------- public animation API
   const sideType = (side) => (side === 0 ? RUBY : SAPPHIRE);
-  const sideColors = (side) => (side === 0 ? ['#ff2d55', '#ffd0da', '#ff8aa0'] : ['#3d7bff', '#cfe0ff', '#7fb0ff']);
+  const sideColors = (side) => (side === 0 ? SHARD_COLORS : ['#4be36a', '#b6ffbf', '#2bd15a']);
+
+  // Takeover effects, chosen at random for each capture (see fx.js). Each turns one piece over
+  // to `type` at the right moment of its animation.
+  const TAKEOVERS = {
+    shards: ['lightning', 'lightning', 'shockwave', 'crystallise', 'shatter', 'tumble'],
+    blobs: ['splash', 'splash', 'shockwave', 'lightning', 'shatter', 'tumble'],
+  };
+  /** Swap a piece over at once (it pops in fresh as the new side). */
+  function turnNow(a, type) {
+    a.type = type; a.swapTo = 0; a.spinAt = -9; a.scale = 0.25; a.appearAt = clockT;
+    if (type === SAPPHIRE) a.drop = true; // a new blob plops into place
+  }
 
   async function playMove(res, side, sfx = {}) {
     const type = sideType(side), { move } = res;
@@ -458,17 +474,61 @@ export function createScene(canvas, { mobile = false } = {}) {
     await flight(type, move.from, move.to, { buzz: move.buzz, scaleFrom: move.buzz ? 0.55 : 1 });
     if (stale()) return;
     const dst = actors[move.to];
-    Object.assign(dst, { type, scale: 1, hopAt: clockT, yaw: Math.atan2(-(cells[move.to].pos.z - cells[move.from].pos.z), cells[move.to].pos.x - cells[move.from].pos.x) });
+    Object.assign(dst, { type, scale: 1, hopAt: clockT, land: true, jelly: null, yaw: Math.atan2(-(cells[move.to].pos.z - cells[move.from].pos.z), cells[move.to].pos.x - cells[move.from].pos.x) });
     sfx.land?.(side);
     burst(tmpV.copy(cells[move.to].pos).setY(0.1), ['#fff3c0'], 8, { up: 1, spread: 1.4, gravity: 0.3 });
-    // neighbours switch sides: a hop and a spin, swapping half way round
-    for (let k = 0; k < res.flips.length; k++) {
-      const a = actors[res.flips[k]];
-      a.spinAt = clockT; a.swapTo = type; a.hopAt = clockT;
-      setTimeout(() => burst(tmpV.copy(cells[a.i].pos).setY(0.45), sideColors(side), 18), 120 / speed);
-      sfx.flip?.(side, k);
-      await wait(70);
-      if (stale()) return;
+    // neighbours switch sides, with a takeover effect picked at random for this capture
+    const from = cells[move.to].pos;
+    const pool = TAKEOVERS[side === 0 ? 'shards' : 'blobs'];
+    const effect = res.flips.length ? (forcedEffect || pool[(Math.random() * pool.length) | 0]) : null;
+    lastEffect = effect;
+    if (effect === 'shockwave') {
+      // one ring for the whole capture; each piece turns as the ring reaches it
+      const speedW = 7, maxR = Math.max(...res.flips.map((i) => cells[i].pos.distanceTo(from))) + 0.8;
+      fx.shockwave(from, maxR, speedW * speed, side === 0 ? '#d9b8ff' : '#7dffa0');
+      sfx.effect?.('shockwave');
+      const order = [...res.flips].sort((i, j) => cells[i].pos.distanceTo(from) - cells[j].pos.distanceTo(from));
+      let tPrev = 0;
+      for (let k = 0; k < order.length; k++) {
+        const i = order[k], tHit = (cells[i].pos.distanceTo(from) / speedW) * 1000;
+        await wait(Math.max(0, tHit - tPrev)); tPrev = tHit;
+        if (stale()) return;
+        turnNow(actors[i], type); burst(tmpV.copy(cells[i].pos).setY(0.4), sideColors(side), 14);
+        sfx.flip?.(side, k);
+      }
+    } else {
+      for (let k = 0; k < res.flips.length; k++) {
+        const i = res.flips[k], a = actors[i], at = cells[i].pos;
+        const old = a.type;
+        if (effect === 'lightning') {
+          fx.lightning(from, at, side === 0 ? '#e2c6ff' : '#b8ffcf');
+          sfx.effect?.('zap');
+          turnNow(a, type); a.jolt = 1.6;
+          burst(tmpV.copy(at).setY(0.5), ['#ffffff', ...sideColors(side)], 22, { up: 2.6, spread: 2.6 });
+        } else if (effect === 'shatter') {
+          fx.shatter(at, old === RUBY ? SHARD_COLORS : ['#4be36a', '#2bd15a', '#b6ffbf']);
+          sfx.effect?.('shatter');
+          a.type = EMPTY; // the old piece is gone; the new one grows in a moment
+          setTimeout(() => { if (!stale()) turnNow(a, type); }, 160 / speed);
+        } else if (effect === 'crystallise') {
+          fx.crystallise(at, SHARD_COLORS);
+          sfx.effect?.('crystal');
+          a.jolt = 2.2;
+          setTimeout(() => { if (!stale()) turnNow(a, type); }, 180 / speed);
+        } else if (effect === 'splash') {
+          fx.splash(from, at, 0.32 / speed);
+          sfx.effect?.('splash');
+          a.meltAt = clockT; // the shard sinks into the goo as it lands
+          setTimeout(() => { if (!stale()) { turnNow(a, type); a.meltAt = undefined; } }, 330 / speed);
+        } else {
+          // the classic: a tumble end over end, changing side half way
+          a.spinAt = clockT; a.swapTo = type; a.hopAt = clockT;
+          setTimeout(() => burst(tmpV.copy(at).setY(0.45), sideColors(side), 18), 120 / speed);
+        }
+        sfx.flip?.(side, k);
+        await wait(effect === 'lightning' ? 110 : 75);
+        if (stale()) return;
+      }
     }
     // a big capture brings the swarm sweeping over
     if (res.flips.length >= 3) swarm.swoop(cells[move.to].pos, clockT);
@@ -495,7 +555,7 @@ export function createScene(canvas, { mobile = false } = {}) {
     const mid = new THREE.Vector3(); let cnt = 0;
     actors.forEach((a, i) => { if (a.type === t) { mid.add(cells[i].pos); cnt++; } });
     swarm.celebrate(cnt ? mid.divideScalar(cnt) : mid.set(0, 0, 0), clockT);
-    const colors = winnerSide === 0 ? ['#ffd23f', '#ff7aa2', '#ffffff', '#9b7bff'] : ['#ff6a1a', '#ffd000', '#d4141c'];
+    const colors = winnerSide === 0 ? SHARD_COLORS : ['#4be36a', '#b6ffbf', '#ffffff', '#2bd15a'];
     for (let k = 0; k < 6; k++) setTimeout(() => {
       const c = cells[(Math.random() * n) | 0].pos;
       burst(tmpV.set(c.x, 2.5, c.z), colors, 40, { up: 1.5, spread: 3, gravity: 0.35 });
@@ -591,13 +651,36 @@ export function createScene(canvas, { mobile = false } = {}) {
         const selected = i === sel;
         a.lift += ((selected ? 0.38 : 0) - a.lift) * Math.min(1, rdt * 10);
         const thinkingSide = thinking >= 0 && sideType(thinking) === a.type;
+        const cheering = a.cheer && t - a.cheer < 2.2;
+        if (a.type === SAPPHIRE && spin >= 1) {
+          // ---- a blob: real jelly (shape matching, jelly.js), driven by pokes
+          if (!a.jelly) {
+            a.jelly = new Jelly();
+            if (a.drop) { a.jelly.place(P.set(c.x, 0.7, c.z), new THREE.Vector3(0, -1.5, 0)); a.drop = false; } // plops in from above
+            else a.jelly.place(P.set(c.x, 0, c.z));
+          }
+          const j = a.jelly;
+          if (a.land) { j.poke(0, -2.8, 0); a.land = false; }                                   // splat on landing
+          if (a.hopAt !== a.lastHop && t - a.hopAt < 0.05) { j.poke(0, 2.4, 0); a.lastHop = a.hopAt; }
+          if (a.jolt) { j.jolt(a.jolt); a.jolt = 0; }                                          // struck by an effect
+          if ((selected || cheering) && t - (a.lastBounce || 0) > (cheering ? 0.45 : 0.62)) { j.poke(0, selected ? 2.3 : 2.8, 0); a.lastBounce = t; }
+          if (Math.random() < dt * (thinkingSide ? 1.2 : 0.12)) j.jolt(thinkingSide ? 0.9 : 0.5); // idle quivers
+          j.step(dt, P.set(c.x, 0, c.z));
+          j.matrix(M, a.scale * GEM_SIZE);
+          meshes.sapphire.setMatrixAt(ns++, M);
+          continue;
+        }
+        if (a.type !== SAPPHIRE) a.jelly = null;
+        if (a.jolt) { a.hopAt = t; a.jolt = 0; }
         a.yaw += dt * (selected ? 2.6 : thinkingSide ? 1.4 : 0.45);
         const hopU = clamp01((t - a.hopAt) / 0.42);
         const hop = hopU < 1 ? Math.sin(hopU * Math.PI) * 0.4 : 0;
-        const cheer = a.cheer && t - a.cheer < 2.2 ? Math.abs(Math.sin((t - a.cheer) * 9 + a.phase)) * 0.25 : 0;
+        const cheer = cheering ? Math.abs(Math.sin((t - a.cheer) * 9 + a.phase)) * 0.25 : 0;
         const hover = 0.08 + Math.sin(t * 1.8 + a.phase) * 0.04;
         const tumble = spin < 1 ? ease(spin) * TAU : 0;
-        gemMatrix(M, c.x, hover + a.lift + hop + cheer, c.z, a.yaw, tumble, a.scale);
+        // a shard caught in goo sinks into it
+        const melt = a.meltAt !== undefined ? clamp01((t - a.meltAt) / 0.33) : 0;
+        gemMatrix(M, c.x, hover + a.lift + hop + cheer - melt * 0.35, c.z, a.yaw, tumble, a.scale * (1 - melt * 0.7));
         if (a.type === RUBY) meshes.ruby.setMatrixAt(nr++, M); else meshes.sapphire.setMatrixAt(ns++, M);
       }
       // gems in flight
@@ -613,7 +696,8 @@ export function createScene(canvas, { mobile = false } = {}) {
       meshes.ruby.count = nr; meshes.sapphire.count = ns;
       meshes.ruby.instanceMatrix.needsUpdate = meshes.sapphire.instanceMatrix.needsUpdate = true;
     }
-    sapphireMat.userData.tick(clockT); // the blobs wobble
+    sapphireMat.userData.tick(clockT); // the blobs' fine ripples
+    fx.update(dt);
     stepParticles(dt);
     world.update(clockT, rdt);
     swarm.update(Math.min(dt, 0.033), clockT);
@@ -655,10 +739,12 @@ export function createScene(canvas, { mobile = false } = {}) {
     set speed(v) { speed = v; },
     get speed() { return speed; },
     /** Settle every piece to match the engine (after undo). */
-    sync(pieces) { pieces.forEach((t, i) => { const a = actors[i]; a.type = t; a.swapTo = 0; a.spinAt = -9; a.scale = 1; a.appearAt = undefined; }); flyers = []; },
+    sync(pieces) { pieces.forEach((t, i) => { const a = actors[i]; a.type = t; a.swapTo = 0; a.spinAt = -9; a.scale = 1; a.appearAt = undefined; a.meltAt = undefined; a.jelly = null; }); flyers = []; },
     burstAt(i, colors) { burst(tmpV.copy(cells[i].pos).setY(0.4), colors, 16); },
     /** Where a cell is on screen (CSS px), e.g. for tests that tap it. */
     screenOf(i) { return toScreen(cells[i].pos); },
+    get lastEffect() { return lastEffect; },
+    set forceEffect(name) { forcedEffect = name || null; },
     debug() { return { pos: camera.position.toArray(), camDist, look: look.toArray(), aspect: camera.aspect, view, tilt: { ...tilt } }; },
     /** A PNG of the current frame (dev/testing). */
     snapshot() { update(performance.now()); return new Promise((r) => canvas.toBlob(r, 'image/png')); },
