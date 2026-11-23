@@ -61,7 +61,10 @@ export function createWorld(scene, { mobile = false } = {}) {
   const spikes = new THREE.InstancedMesh(spike, rockMat, SPIKES);
   const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), v = new THREE.Vector3(), s = new THREE.Vector3(), down = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), Math.PI);
   for (let k = 0; k < SPIKES; k++) {
-    const a = rand() * TAU, d = 14 + rand() * 40, len = 3 + rand() * 9, r = 0.6 + rand() * 1.4;
+    const a = rand() * TAU, len = 3 + rand() * 9, r = 0.6 + rand() * 1.4;
+    // hanging ones stay out past the camera's paths (it orbits ~32 out at the title and glides
+    // between views), so it never flies through one; floor ones can come closer
+    const d = k % 2 ? 40 + rand() * 18 : 14 + rand() * 40;
     if (k % 2) { v.set(Math.cos(a) * d, 30 - len / 2 - rand() * 4, Math.sin(a) * d); q.copy(down); } // hanging
     else { v.set(Math.cos(a) * d, FLOOR + len / 2, Math.sin(a) * d); q.identity(); }
     spikes.setMatrixAt(k, m4.compose(v, q, s.set(r, len, r)));

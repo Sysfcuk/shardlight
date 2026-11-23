@@ -129,7 +129,7 @@ export function createScene(canvas, { mobile = false } = {}) {
   const sapphireMat = blobMaterial('#38d65e', { rich: !mobile });
   const fx = createFx(scene, { mobile });
   let lastEffect = null, forcedEffect = null; // forcedEffect: for testing one effect at a time
-  let hitStop = 0, onCapture = null, selectedAt = 0;
+  let hitStop = 0, onCapture = null, onLand = null, selectedAt = 0;
   const GEO = { ruby: crystalClusterGeometry(), sapphire: blobGeometry() };
   // glowing wisps drift round the cavern (boids), and gather at the sapphire rock now and then
   const wispMat = new THREE.MeshBasicMaterial({ color: '#ffffff', toneMapped: false });
@@ -289,6 +289,12 @@ export function createScene(canvas, { mobile = false } = {}) {
       tLook.set(0, -0.8, 0);
       camAzimuth = a;
     } else playPose(dt);
+    if (cine) {
+      // takedown: low and close over the capture, circling slowly (in slow time)
+      const y = cine.yaw + (clockT - cine.t0) * 0.9, d = 6.4, el = 0.48;
+      tPos.set(cine.at.x + Math.sin(y) * d * Math.cos(el), d * Math.sin(el) + 0.2, cine.at.z + Math.cos(y) * d * Math.cos(el));
+      tLook.copy(cine.at).setY(0.3);
+    }
     // blend from wherever the camera was (smootherstep), then shake and punch on top
     let e = 1;
     if (blend.t < 1) { blend.t = Math.min(1, blend.t + dt / blend.dur); const u = blend.t; e = u * u * u * (u * (u * 6 - 15) + 10); }
@@ -474,18 +480,50 @@ export function createScene(canvas, { mobile = false } = {}) {
   // ---------------------------------------------------------------- public animation API
   const sideType = (side) => (side === 0 ? RUBY : SAPPHIRE);
   const sideColors = (side) => (side === 0 ? SHARD_COLORS : ['#4be36a', '#b6ffbf', '#2bd15a']);
+  const ICE = ['#e8f8ff', '#a9e4ff', '#ffffff', '#7fd3ff'];
+  const oldColors = (t) => (t === RUBY ? SHARD_COLORS : ['#4be36a', '#2bd15a', '#b6ffbf']);
 
-  // Takeover effects, chosen at random for each capture (see fx.js). Each turns one piece over
-  // to `type` at the right moment of its animation.
+  // Game-clock timers: they run on scene time, so they slow down in slow motion, hold during
+  // hit-stop and hurry when you fast-forward (setTimeout can't). Timers from an old board are
+  // dropped; a pause() from one still resolves, so nothing waits forever.
+  const timers = [];
+  const later = (secs, fn) => { timers.push({ at: clockT + secs, fn, gen }); };
+  const pause = (secs) => new Promise((resolve) => timers.push({ at: clockT + secs, fn: resolve, gen, always: true }));
+  function runTimers() {
+    for (let i = timers.length - 1; i >= 0; i--) {
+      const tm = timers[i];
+      if (tm.gen !== gen && !tm.always) { timers.splice(i, 1); continue; }
+      if (clockT >= tm.at || tm.gen !== gen) { timers.splice(i, 1); tm.fn(); }
+    }
+  }
+
+  // Slow motion multiplies the player's speed (1, or 4 while fast-forwarding).
+  let userSpeed = 1, slowmo = 1, cine = null, onCinematic = null;
+  const applySpeed = () => { speed = userSpeed * slowmo; };
+  /** A takedown: time slows and the camera swoops in low over the capture, circling slowly. */
+  function startCinematic(at) {
+    if (reduceMotion) return;
+    cine = { at: at.clone(), t0: clockT, yaw: camAzimuth + 0.5 };
+    startBlend(0.55); slowmo = 0.3; applySpeed(); onCinematic?.(true);
+  }
+  function endCinematic() {
+    if (!cine) return;
+    cine = null; startBlend(0.9); slowmo = 1; applySpeed(); onCinematic?.(false);
+  }
+
+  // Takeover effects, one picked at random for each capture (see fx.js); each turns its pieces
+  // over at the right beat of its animation.
   const TAKEOVERS = {
-    shards: ['lightning', 'lightning', 'shockwave', 'crystallise', 'shatter', 'tumble'],
-    blobs: ['splash', 'splash', 'shockwave', 'lightning', 'shatter', 'tumble'],
+    shards: ['lightning', 'prism', 'meteor', 'shockwave', 'crystallise', 'shatter', 'freeze', 'implode', 'levitate', 'vortex', 'laser', 'fireworks', 'tumble'],
+    blobs: ['splash', 'tentacle', 'meteor', 'shockwave', 'shatter', 'freeze', 'implode', 'levitate', 'vortex', 'laser', 'fireworks', 'lightning', 'tumble'],
   };
+  const STAGGER = { lightning: 0.11, laser: 0.09, prism: 0.08, meteor: 0.12, tentacle: 0.1, freeze: 0.09, implode: 0.08, vortex: 0.1, fireworks: 0.1 };
   /** Swap a piece over at once (it pops in fresh as the new side). */
   function turnNow(a, type) {
-    a.type = type; a.swapTo = 0; a.spinAt = -9; a.scale = 0.25; a.appearAt = clockT;
-    if (type === SAPPHIRE) a.drop = true; // a new blob plops into place
+    a.type = type; a.swapTo = 0; a.spinAt = -9; a.scale = 0.25; a.appearAt = clockT; a.anim = null; a.meltAt = undefined;
+    if (type === SAPPHIRE) { a.drop = true; a.jelly = null; } // a new blob plops into place
   }
+  const up = (v, h) => v.clone().setY(h);
 
   async function playMove(res, side, sfx = {}) {
     const type = sideType(side), { move } = res;
@@ -501,86 +539,150 @@ export function createScene(canvas, { mobile = false } = {}) {
     const dst = actors[move.to];
     Object.assign(dst, { type, scale: 1, hopAt: clockT, land: true, jelly: null, yaw: Math.atan2(-(cells[move.to].pos.z - cells[move.from].pos.z), cells[move.to].pos.x - cells[move.from].pos.x) });
     sfx.land?.(side);
+    onLand?.(move.to);
     // landing: a soft ring of dust, and a little weight in the camera
-    fx.shockwave(cells[move.to].pos, 0.95, 3.2 * speed, '#c9d6ff');
+    fx.shockwave(cells[move.to].pos, 0.95, 3.2, '#c9d6ff');
     burst(tmpV.copy(cells[move.to].pos).setY(0.1), ['#fff3c0', '#c9d6ff'], 10, { up: 1, spread: 1.6, gravity: 0.3 });
     trauma = Math.min(1, trauma + 0.08);
-    // neighbours switch sides, with a takeover effect picked at random for this capture
-    const from = cells[move.to].pos;
+
+    const flips = res.flips, from = cells[move.to].pos;
     const pool = TAKEOVERS[side === 0 ? 'shards' : 'blobs'];
-    const effect = res.flips.length ? (forcedEffect || pool[(Math.random() * pool.length) | 0]) : null;
+    const effect = flips.length ? (forcedEffect || pool[(Math.random() * pool.length) | 0]) : null;
     lastEffect = effect;
-    if (res.flips.length) {
+    const col = side === 0 ? '#e2c6ff' : '#b8ffcf';
+    const big = flips.length >= 4;
+    if (flips.length) {
       // impact: a beat of hit-stop, shake and a zoom punch that grow with the size of the capture
-      const nFlips = res.flips.length;
-      hitStop = Math.min(0.12, 0.04 + nFlips * 0.015);
-      trauma = Math.min(1, trauma + 0.12 + nFlips * 0.07);
-      if (nFlips >= 3) punch = 1;
-      onCapture?.({ count: nFlips, cell: move.to, side, effect });
+      hitStop = Math.min(0.12, 0.04 + flips.length * 0.015);
+      trauma = Math.min(1, trauma + 0.12 + flips.length * 0.07);
+      if (flips.length === 3) punch = 1;
+      onCapture?.({ count: flips.length, cell: move.to, side, effect });
+      // four or more: a slow-motion takedown
+      if (big) { startCinematic(from); await pause(0.18); if (stale()) return endCinematic(); }
     }
+
     if (effect === 'shockwave') {
       // one ring for the whole capture; each piece turns as the ring reaches it
-      const speedW = 7, maxR = Math.max(...res.flips.map((i) => cells[i].pos.distanceTo(from))) + 0.8;
-      fx.shockwave(from, maxR, speedW * speed, side === 0 ? '#d9b8ff' : '#7dffa0');
+      const speedW = 7, maxR = Math.max(...flips.map((i) => cells[i].pos.distanceTo(from))) + 0.8;
+      fx.shockwave(from, maxR, speedW, side === 0 ? '#d9b8ff' : '#7dffa0');
       sfx.effect?.('shockwave');
-      const order = [...res.flips].sort((i, j) => cells[i].pos.distanceTo(from) - cells[j].pos.distanceTo(from));
-      let tPrev = 0;
-      for (let k = 0; k < order.length; k++) {
-        const i = order[k], tHit = (cells[i].pos.distanceTo(from) / speedW) * 1000;
-        await wait(Math.max(0, tHit - tPrev)); tPrev = tHit;
-        if (stale()) return;
-        turnNow(actors[i], type); burst(tmpV.copy(cells[i].pos).setY(0.4), sideColors(side), 14);
+      [...flips].sort((i, j) => cells[i].pos.distanceTo(from) - cells[j].pos.distanceTo(from)).forEach((i, k) => {
+        later(cells[i].pos.distanceTo(from) / speedW, () => { turnNow(actors[i], type); burst(up(cells[i].pos, 0.4), sideColors(side), 14); sfx.flip?.(side, k); });
+      });
+      await pause(maxR / speedW);
+    } else if (effect === 'levitate') {
+      // they all rise and hang in the air... then slam down as the new side
+      flips.forEach((i, k) => { actors[i].anim = { kind: 'levitate', t0: clockT + k * 0.05, dur: 0.7 }; });
+      sfx.effect?.('levitate');
+      await pause(0.62);
+      flips.forEach((i, k) => later(k * 0.05, () => {
+        const at = cells[i].pos;
+        turnNow(actors[i], type); fx.shockwave(at, 0.95, 4, col); burst(up(at, 0.15), sideColors(side), 16, { up: 1.2, spread: 2.4 });
+        trauma = Math.min(1, trauma + 0.1); sfx.effect?.('impact'); sfx.flip?.(side, k);
+      }));
+      await pause(0.05 * flips.length + 0.1);
+    } else if (effect === 'prism') {
+      // daylight pours down onto the attacker and splits into a rainbow of beams
+      fx.beam(up(from, 9), up(from, 0.75), '#ffffff', 0.55, 0.09);
+      sfx.effect?.('prism');
+      await pause(0.14);
+      for (let k = 0; k < flips.length; k++) {
+        const i = flips[k], at = cells[i].pos, c = SHARD_COLORS[k % SHARD_COLORS.length];
+        fx.beam(up(from, 0.7), up(at, 0.35), c, 0.4, 0.045);
+        turnNow(actors[i], type); burst(up(at, 0.45), [c, '#ffffff'], 18, { up: 2, spread: 2.2 });
         sfx.flip?.(side, k);
+        await pause(STAGGER.prism);
+        if (stale()) return endCinematic();
       }
     } else {
-      for (let k = 0; k < res.flips.length; k++) {
-        const i = res.flips[k], a = actors[i], at = cells[i].pos;
-        const old = a.type;
-        if (effect === 'lightning') {
-          fx.lightning(from, at, side === 0 ? '#e2c6ff' : '#b8ffcf');
-          sfx.effect?.('zap');
-          turnNow(a, type); a.jolt = 1.6;
-          burst(tmpV.copy(at).setY(0.5), ['#ffffff', ...sideColors(side)], 22, { up: 2.6, spread: 2.6 });
-        } else if (effect === 'shatter') {
-          fx.shatter(at, old === RUBY ? SHARD_COLORS : ['#4be36a', '#2bd15a', '#b6ffbf']);
-          sfx.effect?.('shatter');
-          a.type = EMPTY; // the old piece is gone; the new one grows in a moment
-          setTimeout(() => { if (!stale()) turnNow(a, type); }, 160 / speed);
-        } else if (effect === 'crystallise') {
-          fx.crystallise(at, SHARD_COLORS);
-          sfx.effect?.('crystal');
-          a.jolt = 2.2;
-          setTimeout(() => { if (!stale()) turnNow(a, type); }, 180 / speed);
-        } else if (effect === 'splash') {
-          fx.splash(from, at, 0.32 / speed);
-          sfx.effect?.('splash');
-          a.meltAt = clockT; // the shard sinks into the goo as it lands
-          setTimeout(() => { if (!stale()) { turnNow(a, type); a.meltAt = undefined; } }, 330 / speed);
-        } else {
-          // the classic: a tumble end over end, changing side half way
-          a.spinAt = clockT; a.swapTo = type; a.hopAt = clockT;
-          setTimeout(() => burst(tmpV.copy(at).setY(0.45), sideColors(side), 18), 120 / speed);
+      for (let k = 0; k < flips.length; k++) {
+        const i = flips[k], a = actors[i], at = cells[i].pos, old = a.type;
+        switch (effect) {
+          case 'lightning':
+            fx.lightning(from, at, col); sfx.effect?.('zap');
+            turnNow(a, type); a.jolt = 1.6;
+            burst(up(at, 0.5), ['#ffffff', ...sideColors(side)], 22, { up: 2.6, spread: 2.6 });
+            break;
+          case 'laser':
+            fx.beam(up(from, 0.55), up(at, 0.32), col, 0.32, 0.035); sfx.effect?.('laser');
+            turnNow(a, type); a.jolt = 1.3;
+            burst(up(at, 0.35), ['#ffffff', col], 14, { up: 1.4, spread: 2 });
+            break;
+          case 'meteor': {
+            const sky = at.clone().add(new THREE.Vector3((Math.random() - 0.5) * 3, 7, (Math.random() - 0.5) * 3));
+            fx.meteor(sky, up(at, 0.25), 0.42, side === 0 ? '#ffb46b' : '#9dff8a'); sfx.effect?.('whoosh');
+            later(0.42, () => {
+              turnNow(a, type); fx.shockwave(at, 1.15, 5, col); fx.shatter(at, oldColors(old), 10);
+              burst(up(at, 0.3), ['#ffe0a0', '#ffffff', ...sideColors(side)], 26, { up: 2.4, spread: 3 });
+              trauma = Math.min(1, trauma + 0.2); sfx.effect?.('impact');
+            });
+            break;
+          }
+          case 'tentacle':
+            fx.tentacle(from, at, '#3fd96a', 0.28); sfx.effect?.('splash');
+            later(0.28, () => { a.meltAt = clockT; a.jolt = 1; });
+            later(0.56, () => turnNow(a, type));
+            break;
+          case 'freeze':
+            fx.iceBlock(at, 0.44); sfx.effect?.('freeze');
+            later(0.42, () => { fx.shatter(at, ICE, 26); turnNow(a, type); sfx.effect?.('shatter'); trauma = Math.min(1, trauma + 0.1); });
+            break;
+          case 'implode':
+            a.anim = { kind: 'implode', t0: clockT, dur: 0.3 }; sfx.effect?.('implode');
+            later(0.3, () => { turnNow(a, type); fx.shockwave(at, 1.0, 5, col); burst(up(at, 0.35), ['#ffffff', ...sideColors(side)], 30, { up: 1.6, spread: 3.6 }); });
+            break;
+          case 'vortex':
+            fx.vortex(at, col, 0.55); a.anim = { kind: 'spin', t0: clockT, dur: 0.5 }; sfx.effect?.('vortex');
+            later(0.46, () => { turnNow(a, type); burst(up(at, 0.6), sideColors(side), 18, { up: 1.8, spread: 2 }); });
+            break;
+          case 'fireworks':
+            fx.rocket(at, col, 0.45); sfx.effect?.('launch');
+            later(0.08, () => turnNow(a, type));
+            later(0.45, () => { burst(up(at, 2.8), [...sideColors(side), '#ffffff'], 46, { up: 1, spread: 3.8, gravity: 0.4 }); sfx.effect?.('pop'); });
+            break;
+          case 'shatter':
+            fx.shatter(at, oldColors(old)); sfx.effect?.('shatter');
+            a.type = EMPTY; // the old piece is gone; the new one grows in a moment
+            later(0.16, () => turnNow(a, type));
+            break;
+          case 'crystallise':
+            fx.crystallise(at, SHARD_COLORS); sfx.effect?.('crystal');
+            a.jolt = 2.2;
+            later(0.18, () => turnNow(a, type));
+            break;
+          case 'splash':
+            fx.splash(from, at, 0.32); sfx.effect?.('splash');
+            a.meltAt = clockT; // the shard sinks into the goo as it lands
+            later(0.33, () => turnNow(a, type));
+            break;
+          default:
+            // the classic: a tumble end over end, changing side half way
+            a.spinAt = clockT; a.swapTo = type; a.hopAt = clockT;
+            later(0.12, () => burst(up(at, 0.45), sideColors(side), 18));
         }
         sfx.flip?.(side, k);
-        await wait(effect === 'lightning' ? 110 : 75);
-        if (stale()) return;
+        await pause(STAGGER[effect] ?? 0.075);
+        if (stale()) return endCinematic();
       }
+      // let the slower effects (meteors, freezes, rockets) land before moving on
+      if (['meteor', 'tentacle', 'freeze', 'implode', 'vortex', 'fireworks'].includes(effect)) await pause(0.45);
     }
-    // a big capture brings the swarm sweeping over
-    if (res.flips.length >= 3) swarm.swoop(cells[move.to].pos, clockT);
-    if (res.flips.length) await wait(300);
+    // a big capture brings the wisps sweeping over
+    if (flips.length >= 3) swarm.swoop(cells[move.to].pos, clockT);
+    if (flips.length) await pause(big ? 0.45 : 0.3);
+    if (big) endCinematic();
     if (stale()) return;
     if (res.over && res.filled.length) {
-      await wait(200);
+      await pause(0.2);
       const ft = sideType(res.filledBy);
       for (let k = 0; k < res.filled.length; k++) {
         const a = actors[res.filled[k]];
-        Object.assign(a, { type: ft, scale: 0, appearAt: clockT, hopAt: clockT });
+        Object.assign(a, { type: ft, scale: 0, appearAt: clockT, hopAt: clockT, jelly: null });
         sfx.fill?.(k);
-        await wait(45);
+        await pause(0.045);
         if (stale()) return;
       }
-      await wait(250);
+      await pause(0.25);
     }
   }
 
@@ -592,10 +694,10 @@ export function createScene(canvas, { mobile = false } = {}) {
     actors.forEach((a, i) => { if (a.type === t) { mid.add(cells[i].pos); cnt++; } });
     swarm.celebrate(cnt ? mid.divideScalar(cnt) : mid.set(0, 0, 0), clockT);
     const colors = winnerSide === 0 ? SHARD_COLORS : ['#4be36a', '#b6ffbf', '#ffffff', '#2bd15a'];
-    for (let k = 0; k < 6; k++) setTimeout(() => {
+    for (let k = 0; k < 6; k++) later(k * 0.16, () => {
       const c = cells[(Math.random() * n) | 0].pos;
       burst(tmpV.set(c.x, 2.5, c.z), colors, 40, { up: 1.5, spread: 3, gravity: 0.35 });
-    }, k * 160);
+    });
   }
 
   // ---------------------------------------------------------------- per-frame
@@ -640,6 +742,7 @@ export function createScene(canvas, { mobile = false } = {}) {
     let dt = rdt * speed;
     if (hitStop > 0) { hitStop -= rdt; dt = reduceMotion ? dt : 0; }
     clockT += dt;
+    runTimers();
     const t = clockT;
     placeCamera(rdt);
     for (const c of clouds.children) { c.position.x += c.userData.speed * rdt; if (c.position.x > 70) c.position.x = -70; }
@@ -695,6 +798,18 @@ export function createScene(canvas, { mobile = false } = {}) {
         a.lift += ((selected ? 0.38 : 0) - a.lift) * Math.min(1, rdt * 10);
         const thinkingSide = thinking >= 0 && sideType(thinking) === a.type;
         const cheering = a.cheer && t - a.cheer < 2.2;
+        // scripted takeover moves: implode (crush to a point), spin (whirl up), levitate (rise and hang)
+        if (a.anim && t >= a.anim.t0) {
+          const u = clamp01((t - a.anim.t0) / a.anim.dur), k = a.anim.kind;
+          let y = 0.08, s = a.scale, yaw = a.yaw, tum = 0;
+          if (k === 'implode') { s *= Math.pow(1 - u, 2); yaw += u * u * 14; y += u * 0.25; }
+          else if (k === 'spin') { yaw += u * u * 26; y += Math.sin(u * Math.PI) * 0.55; s *= 1 - 0.35 * u; }
+          else if (k === 'levitate') { const r = ease(Math.min(1, u / 0.6)); y += r * 1.5 + Math.sin(t * 6 + a.phase) * 0.04 * r; tum = r * 0.9 * Math.sin(a.phase * 3); yaw += r * 2; }
+          gemMatrix(M, c.x, y, c.z, yaw, tum, s);
+          if (a.type === RUBY) meshes.ruby.setMatrixAt(nr++, M); else meshes.sapphire.setMatrixAt(ns++, M);
+          a.jelly = null;
+          continue;
+        }
         if (a.type === SAPPHIRE && spin >= 1) {
           // ---- a blob: real jelly (shape matching, jelly.js), driven by pokes
           if (!a.jelly) {
@@ -748,8 +863,10 @@ export function createScene(canvas, { mobile = false } = {}) {
     sun.shadow.camera.left = sun.shadow.camera.bottom = -9; sun.shadow.camera.right = sun.shadow.camera.top = 9;
     sun.shadow.camera.updateProjectionMatrix();
     // keep the sharp band on the board
-    tmpV.set(0, 0, 0).project(camera);
+    (cine ? tmpV.copy(cine.at) : tmpV.set(0, 0, 0)).project(camera);
     tiltH.uniforms.uFocus.value = tiltV.uniforms.uFocus.value = (tmpV.y + 1) / 2;
+    // a shallower depth of field during a takedown
+    const band = cine ? 0.1 : 0.2; tiltH.uniforms.uBand.value += (band - tiltH.uniforms.uBand.value) * Math.min(1, rdt * 4); tiltV.uniforms.uBand.value = tiltH.uniforms.uBand.value;
     composer.render();
   }
   const loop = (now) => { update(now); requestAnimationFrame(loop); };
@@ -776,8 +893,36 @@ export function createScene(canvas, { mobile = false } = {}) {
     punch() { punch = 1; },
     /** Called with (clientX, clientY) for a tap that wasn't a drag or pinch. */
     onTap(fn) { onTap = fn; },
+    /**
+     * Portraits of the two pieces for the HUD badges ({ shards, blobs } as PNG data URLs), lit
+     * like the cave. Rendered once with a throwaway renderer, so the main one is untouched.
+     */
+    portraits(size = 160) {
+      const c = document.createElement('canvas'); c.width = c.height = size;
+      const r = new THREE.WebGLRenderer({ canvas: c, antialias: true, alpha: true, preserveDrawingBuffer: true });
+      r.outputColorSpace = THREE.SRGBColorSpace; r.toneMapping = THREE.ACESFilmicToneMapping; r.toneMappingExposure = 0.9;
+      const s = new THREE.Scene();
+      s.environment = new THREE.PMREMGenerator(r).fromScene(new RoomEnvironment(), 0.04).texture;
+      s.environmentIntensity = 0.45; // less grey reflection, richer colour
+      s.add(new THREE.HemisphereLight('#c8d4ff', '#2a1838', 0.45));
+      const key = new THREE.DirectionalLight('#ffffff', 2.2); key.position.set(2, 4, 3); s.add(key);
+      const rim = new THREE.DirectionalLight('#8fe9ff', 2.4); rim.position.set(-3, 1.5, -2); s.add(rim);
+      const cam = new THREE.PerspectiveCamera(30, 1, 0.1, 20);
+      const out = {};
+      for (const [name, geo, mat, h, d] of [['shards', GEO.ruby, crystalMaterial({ rich: false }), 0.48, 2.3], ['blobs', GEO.sapphire, blobMaterial('#38d65e', { rich: false }), 0.26, 1.55]]) {
+        const m = new THREE.Mesh(geo, mat); m.rotation.y = name === 'shards' ? 0.5 : 0; s.add(m);
+        cam.position.set(0, h + d * 0.26, d); cam.lookAt(0, h, 0);
+        r.setClearColor(0x000000, 0); r.render(s, cam);
+        out[name] = c.toDataURL('image/png');
+        s.remove(m); mat.dispose();
+      }
+      r.dispose(); r.forceContextLoss?.();
+      return out;
+    },
     /** Called with { count, cell, side, effect } the moment a capture lands. */
     onCapture(fn) { onCapture = fn; },
+    /** Called with the cell index when a moving piece lands (the board's new counts are now true). */
+    onLand(fn) { onLand = fn; },
     /**
      * Compile every shader the game will need before the player sees anything, so the first
      * capture doesn't hitch while lightning or fragments compile. Fires each effect once, out of
@@ -787,6 +932,8 @@ export function createScene(canvas, { mobile = false } = {}) {
       const away = new THREE.Vector3(0, -40, 0);
       fx.lightning(away, away.clone().add(new THREE.Vector3(1, 0, 0)));
       fx.shatter(away, ['#ffffff']); fx.splash(away, away, 0.1, 2); fx.crystallise(away, ['#ffffff'], 2); fx.shockwave(away, 0.5, 1, '#ffffff');
+      const off = away.clone().add(new THREE.Vector3(1, 0, 1));
+      fx.beam(away, off, '#ffffff', 0.1); fx.meteor(off, away, 0.1, '#ffffff'); fx.tentacle(away, off, '#3fd96a', 0.1); fx.iceBlock(away, 0.1); fx.vortex(away, '#ffffff', 0.1); fx.rocket(away, '#ffffff', 0.1);
       fx.update(0.001);
       try { await renderer.compileAsync(scene, camera); } catch { /* older drivers: compile on first use */ }
       update(performance.now());
@@ -799,8 +946,10 @@ export function createScene(canvas, { mobile = false } = {}) {
       if (instant) Object.assign(orbit, { yaw: 0, elev: ELEV0, zoom: 1, resetting: false }); else orbit.resetting = true;
       wasDefault = true; onViewChange?.(false);
     },
-    set speed(v) { speed = v; },
-    get speed() { return speed; },
+    set speed(v) { userSpeed = v; applySpeed(); },
+    get speed() { return userSpeed; },
+    /** Called with true when a slow-motion takedown starts, false when it ends. */
+    onCinematic(fn) { onCinematic = fn; },
     /** Settle every piece to match the engine (after undo). */
     sync(pieces) { pieces.forEach((t, i) => { const a = actors[i]; a.type = t; a.swapTo = 0; a.spinAt = -9; a.scale = 1; a.appearAt = undefined; a.meltAt = undefined; a.jelly = null; }); flyers = []; },
     burstAt(i, colors) { burst(tmpV.copy(cells[i].pos).setY(0.4), colors, 16); },

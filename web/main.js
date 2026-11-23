@@ -97,6 +97,16 @@ const sfx = (() => {
       else if (name === 'splash') { tone(220, 0.24, { vol: 0.12, slide: -130 }); tone(330, 0.14, { vol: 0.06, slide: 220, delay: 0.05 }); noise(0.18, 700, 0.05); }
       else if (name === 'crystal') { [1319, 1760, 2349, 2794].forEach((f, k) => chime(f, k * 0.035, 0.045)); }
       else if (name === 'shockwave') { tone(62, 0.7, { vol: 0.16, slide: -25, wet: 0.5 }); noise(0.5, 500, 0.06); }
+      else if (name === 'laser') { tone(1800, 0.22, { type: 'sawtooth', vol: 0.035, slide: -1400, wet: 0.5 }); tone(900, 0.18, { type: 'square', vol: 0.02, slide: -600 }); }
+      else if (name === 'whoosh') { noise(0.42, 900, 0.07, { q: 0.4 }); tone(400, 0.42, { type: 'triangle', vol: 0.025, slide: -320 }); }
+      else if (name === 'impact') { tone(55, 0.5, { vol: 0.2, slide: -20, wet: 0.6 }); noise(0.3, 260, 0.12, { wet: 0.5 }); }
+      else if (name === 'freeze') { [2637, 3136, 3520].forEach((f, k) => tone(f * detune(), 0.4, { vol: 0.03, delay: k * 0.05 })); noise(0.35, 7000, 0.04); }
+      else if (name === 'implode') { tone(900, 0.3, { vol: 0.07, slide: -820 }); tone(60, 0.35, { vol: 0.12, delay: 0.28, wet: 0.6 }); }
+      else if (name === 'vortex') { tone(180, 0.5, { type: 'triangle', vol: 0.05, slide: 700, vib: 12 }); noise(0.5, 1400, 0.04); }
+      else if (name === 'launch') { noise(0.45, 3000, 0.05, { q: 0.5 }); tone(300, 0.45, { type: 'triangle', vol: 0.03, slide: 900 }); }
+      else if (name === 'pop') { noise(0.25, 2200, 0.12); [1568, 1976, 2349].forEach((f, k) => chime(f, 0.02 + k * 0.03, 0.04)); }
+      else if (name === 'levitate') { tone(220, 0.7, { type: 'sine', vol: 0.06, slide: 440, vib: 6 }); }
+      else if (name === 'prism') { [1047, 1319, 1568, 2093, 2637].forEach((f, k) => chime(f, k * 0.04, 0.045)); }
     },
     combo(n) { // a rising arpeggio for big captures
       const steps = Math.min(5, n - 1);
@@ -117,6 +127,12 @@ const E = await loadEngine();
 const E2 = await loadEngine(); // a scratch copy of the rules, for previewing moves
 const AI = createAi(E);
 const view = createScene($('#view'), { mobile: MOBILE });
+// the badge portraits are the real 3D pieces, rendered once
+try { const pics = view.portraits(); $('#ava-bee').src = pics.shards; $('#ava-wasp').src = pics.blobs; } catch { /* no WebGL for a second canvas: the ring still shows */ }
+// slow-motion takedowns get cinematic letterbox bars
+view.onCinematic((on) => $('#bars').classList.toggle('on', on && screen === 'game'));
+// counts on the badges change when the piece lands, not when the move starts
+view.onLand(() => { if (G) G.target = [E.count(0), E.count(1)]; updateHud(); });
 
 // ---------------------------------------------------------------- game state
 let G = null; // { layout, mode, level, human, demo, busy, selected, targets, token, stats }
@@ -130,13 +146,13 @@ function newGame({ layout, mode, level, human, demo = false }) {
   const cells = E.newGame(layout);
   E2.newGame(layout);
   G = { layout, mode, level, human, demo, n: cells.length, busy: false, selected: -1, targets: [], token: (G?.token || 0) + 1, hint: null,
-    stats: { caps: [0, 0], best: [0, 0], moves: [0, 0] } };
+    stats: { caps: [0, 0], best: [0, 0], moves: [0, 0] }, target: [E.count(0), E.count(1)] };
   view.setBoard(cells, pieces());
   view.resetView(true);
   view.setThinking(-1);
   view.setHint(null);
   clearBadges();
-  shown[0] = E.count(0); shown[1] = E.count(1);
+  shown[0] = lastTarget[0] = E.count(0); shown[1] = lastTarget[1] = E.count(1);
   updateHud();
   nextTurn();
 }
@@ -148,11 +164,17 @@ function updateHud() {
   const turn = E.turn;
   $('#pill-bee').classList.toggle('on', E.winner < 0 && turn === 0);
   $('#pill-wasp').classList.toggle('on', E.winner < 0 && turn === 1);
-  if (G.mode === 'ai') {
-    $('#name-bee').textContent = G.human === 0 ? 'You' : `Shards · ${LEVELS[G.level]}`;
-    $('#name-wasp').textContent = G.human === 1 ? 'You' : `Blobs · ${LEVELS[G.level]}`;
-  } else { $('#name-bee').textContent = 'Shards'; $('#name-wasp').textContent = 'Blobs'; }
-  const a = E.count(0), b = E.count(1), tot = Math.max(1, a + b);
+  // names and roles: "You / Shards" against "Blobs / Medium AI", or "Shards / Player 1"
+  for (const side of [0, 1]) {
+    const key = side ? 'wasp' : 'bee', human = G.mode === 'local' || G.human === side;
+    $(`#name-${key}`).textContent = G.mode === 'ai' && human ? 'You' : SIDE_NAME[side];
+    $(`#sub-${key}`).textContent = G.mode === 'local' ? `Player ${side + 1}` : human ? SIDE_NAME[side] : `${LEVELS[G.level]} AI`;
+    $(`#pill-${key}`).classList.toggle('think', E.winner < 0 && E.turn === side && !G.demo && !human && G.busy === false);
+  }
+  // the ring round each portrait (and the bar below) show each side's share of the board
+  const [a, b] = G.target || [E.count(0), E.count(1)], tot = Math.max(1, a + b);
+  $('#pill-bee').style.setProperty('--p', ((a / tot) * 100).toFixed(1));
+  $('#pill-wasp').style.setProperty('--p', ((b / tot) * 100).toFixed(1));
   $('#tug .a').style.width = `${(a / tot) * 100}%`;
   $('#tug .b').style.width = `${(b / tot) * 100}%`;
   let status = '';
@@ -168,9 +190,16 @@ function updateHud() {
   $('#btn-undo').disabled = G.busy || E.movesMade === 0 || (G.mode === 'ai' && E.movesMade < (G.human === 0 ? 1 : 2));
   $('#btn-hint').disabled = G.busy || E.winner >= 0 || !isHuman(turn);
 }
+const lastTarget = [3, 3];
 function tickCounters() {
   if (G) for (const side of [0, 1]) {
-    const real = E.count(side), el = side ? $('#n-wasp') : $('#n-bee');
+    const real = (G.target || [E.count(0), E.count(1)])[side], el = side ? $('#n-wasp') : $('#n-bee');
+    // a floating "+3" / "−2" each time a side's count changes
+    if (real !== lastTarget[side]) {
+      const d = real - lastTarget[side], dl = side ? $('#d-wasp') : $('#d-bee');
+      lastTarget[side] = real;
+      if (Math.abs(d) < 40 && !G.demo) { dl.textContent = d > 0 ? `+${d}` : `−${-d}`; dl.className = 'delta ' + (d > 0 ? 'up' : 'down'); void dl.offsetWidth; }
+    }
     if (shown[side] !== real) {
       shown[side] += Math.sign(real - shown[side]);
       el.textContent = shown[side];
@@ -267,6 +296,7 @@ async function play(from, to) {
   if (!G || token !== G.token) return;
   view.speed = 1;
   G.busy = false;
+  G.target = [E.count(0), E.count(1)];
   updateHud();
   nextTurn();
 }
@@ -362,6 +392,7 @@ $('#btn-undo').onclick = () => {
   do { if (!E.undo()) break; } while (G.mode === 'ai' && E.turn !== G.human);
   deselect(); G.hint = null; view.setHint(null);
   view.sync(pieces());
+  G.target = [E.count(0), E.count(1)];
   closeSheet('result');
   sfx.tap();
   updateHud();

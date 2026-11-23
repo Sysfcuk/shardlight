@@ -54,22 +54,44 @@
   /* hud */
   #hud { justify-content: space-between; }
   #scores { display: flex; align-items: center; gap: 8px; }
-  .pill { flex: 1; display: flex; align-items: center; gap: 8px; border-radius: 18px; padding: 6px 12px 6px 6px; transition: transform .25s, box-shadow .25s; min-width: 0; }
+  /* player badges: a portrait in a ring that fills with that side's share of the board, the name
+     and role, and the score; the side to move glows with a slowly turning border */
+  .pill { --side: var(--ruby); --p: 50; position: relative; flex: 1; display: flex; align-items: center; gap: 9px; border-radius: 20px; padding: 6px 12px 6px 6px; min-width: 0;
+    transition: transform .3s cubic-bezier(.3, 1.6, .5, 1), box-shadow .3s, background .3s; isolation: isolate; }
+  .pill.wasp { --side: var(--sapph); flex-direction: row-reverse; padding: 6px 6px 6px 12px; text-align: right; }
   .ico { width: 30px; height: 30px; display: block; }
   #result .ico { width: 40px; height: 40px; }
-  .pill .who { width: 38px; height: 38px; border-radius: 12px; display: grid; place-items: center; flex: none; }
-  .pill.bee .who { background: rgba(180, 92, 255, .18); } .pill.wasp .who { background: rgba(56, 214, 94, .16); }
-  .pill .name { font-size: 12px; font-weight: 700; color: var(--ink-2); line-height: 1.05; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .pill .n { font-family: 'Unbounded', sans-serif; font-size: 23px; font-weight: 700; line-height: 1.05; letter-spacing: -.02em; }
-  .pill .txt { min-width: 0; flex: 1; }
-  .pill.on { transform: translateY(-2px) scale(1.03); }
-  .pill.bee.on { box-shadow: 0 0 0 2px var(--ruby), 0 0 22px rgba(180, 92, 255, .6); }
-  .pill.wasp.on { box-shadow: 0 0 0 2px var(--sapph), 0 0 22px rgba(56, 214, 94, .55); }
+  .pill .who { position: relative; width: 46px; height: 46px; border-radius: 50%; flex: none; padding: 3px;
+    background: conic-gradient(var(--side) calc(var(--p) * 1%), rgba(255, 255, 255, .09) 0); transition: --p .6s; box-shadow: 0 0 14px color-mix(in srgb, var(--side) 35%, transparent); }
+  .pill .who img { display: block; width: 100%; height: 100%; border-radius: 50%; object-fit: cover; background: radial-gradient(circle at 50% 35%, #2b3360, #0e1124 75%); }
+  .pill .who::after { content: ''; position: absolute; inset: -3px; border-radius: 50%; border: 2px solid transparent; border-top-color: var(--side); opacity: 0; }
+  .pill.think .who::after { opacity: 1; animation: spin .9s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .pill .txt { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 1px; }
+  .pill .name { font-family: 'Unbounded', sans-serif; font-size: 12px; font-weight: 700; color: var(--ink); line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; letter-spacing: -.01em; }
+  .pill .sub { font-size: 11px; font-weight: 600; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; letter-spacing: .02em; }
+  .pill .score { position: relative; flex: none; }
+  .pill .n { font-family: 'Unbounded', sans-serif; font-size: 26px; font-weight: 800; line-height: 1; letter-spacing: -.03em; color: #fff; }
+  .pill .delta { position: absolute; left: 50%; top: -4px; transform: translateX(-50%); font-family: 'Unbounded', sans-serif; font-size: 13px; font-weight: 800; opacity: 0; pointer-events: none; white-space: nowrap; }
+  .pill .delta.up { color: var(--side); animation: deltaUp 1s ease-out; } .pill .delta.down { color: #ff7a8c; animation: deltaUp 1s ease-out; }
+  @keyframes deltaUp { 0% { opacity: 0; transform: translate(-50%, 6px) scale(.7); } 20% { opacity: 1; transform: translate(-50%, -6px) scale(1.15); } 100% { opacity: 0; transform: translate(-50%, -22px) scale(1); } }
+  .pill.on { transform: translateY(-2px) scale(1.035); background: color-mix(in srgb, var(--side) 14%, rgba(22, 26, 46, .9)); box-shadow: 0 8px 26px rgba(0, 0, 0, .4), 0 0 26px color-mix(in srgb, var(--side) 45%, transparent); }
+  .pill::before { content: ''; position: absolute; inset: -1.5px; border-radius: 21px; padding: 1.5px; z-index: -1; opacity: 0; transition: opacity .3s;
+    background: conic-gradient(from var(--a, 0deg), transparent 0 55%, var(--side) 75%, #fff 80%, var(--side) 85%, transparent 100%);
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude; }
+  .pill.on::before { opacity: 1; animation: orbitBorder 2.6s linear infinite; }
+  @property --a { syntax: '<angle>'; inherits: false; initial-value: 0deg; }
+  @property --p { syntax: '<number>'; inherits: true; initial-value: 50; }
+  @keyframes orbitBorder { to { --a: 360deg; } }
+  /* cinematic letterbox for slow-motion takedowns */
+  .bars::before, .bars::after { content: ''; position: fixed; left: 0; right: 0; height: 0; background: #000; z-index: 5; transition: height .45s cubic-bezier(.2, .9, .3, 1); pointer-events: none; }
+  .bars::before { top: 0; } .bars::after { bottom: 0; }
+  .bars.on::before, .bars.on::after { height: 9vh; }
   .icon-btn { width: 46px; height: 46px; border-radius: 14px; display: grid; place-items: center; flex: none; }
   .icon-btn svg { width: 22px; height: 22px; }
   #status { align-self: center; margin-top: 8px; background: rgba(10, 12, 26, .75); border: 1px solid var(--edge); color: var(--ink); padding: 6px 14px; border-radius: 99px; font-size: 15px; font-weight: 700; transition: opacity .3s; }
-  #tools { display: flex; justify-content: center; gap: 14px; }
-  .tool { display: flex; flex-direction: column; align-items: center; gap: 2px; border-radius: 16px; padding: 8px 0 6px; width: 84px; font-size: 13px; font-weight: 700; }
+  #tools { display: flex; justify-content: center; gap: 10px; }
+  .tool { display: flex; flex-direction: column; align-items: center; gap: 2px; border-radius: 16px; padding: 8px 0 6px; width: 76px; font-size: 13px; font-weight: 700; }
   .tool svg { width: 26px; height: 26px; color: var(--glow); }
   .tool:active, .icon-btn:active, .soft:active { transform: translateY(2px); }
   .tool:disabled { opacity: .4; }
@@ -191,6 +213,7 @@
 <div id="boot"><div><svg class="mark" viewBox="0 0 40 40"><use href="#i-bee"/></svg><div class="bar"><i></i></div></div></div>
 <div id="badges"></div>
 <div id="callouts"></div>
+<div id="bars" class="bars"></div>
 
 <section id="title" class="layer">
   <div class="brand">
@@ -207,15 +230,15 @@
 <section id="hud" class="layer hidden off">
   <div>
     <div id="scores">
-      <button class="icon-btn glass" id="btn-menu" aria-label="Menu"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
-      <div class="pill bee glass" id="pill-bee"><span class="who"><svg class="ico" viewBox="0 0 40 40"><use href="#i-bee"/></svg></span><span class="txt"><span class="name" id="name-bee">Shards</span><br><span class="n" id="n-bee">3</span></span></div>
-      <div class="pill wasp glass" id="pill-wasp"><span class="who"><svg class="ico" viewBox="0 0 40 40"><use href="#i-wasp"/></svg></span><span class="txt"><span class="name" id="name-wasp">Blobs</span><br><span class="n" id="n-wasp">3</span></span></div>
+      <div class="pill bee glass" id="pill-bee"><span class="who"><img id="ava-bee" alt="Shards"></span><span class="txt"><span class="name" id="name-bee">Shards</span><span class="sub" id="sub-bee"></span></span><span class="score"><span class="n" id="n-bee">3</span><span class="delta" id="d-bee"></span></span></div>
+      <div class="pill wasp glass" id="pill-wasp"><span class="who"><img id="ava-wasp" alt="Blobs"></span><span class="txt"><span class="name" id="name-wasp">Blobs</span><span class="sub" id="sub-wasp"></span></span><span class="score"><span class="n" id="n-wasp">3</span><span class="delta" id="d-wasp"></span></span></div>
     </div>
     <div id="tug"><i class="a" style="width:50%"></i><i class="b" style="width:50%"></i></div>
     <div style="display:flex;justify-content:center;align-items:center;gap:8px"><span id="status">Your move</span>
       <button class="icon-btn glass hidden" id="btn-view" aria-label="Recentre the board" style="width:36px;height:36px;border-radius:12px;margin-top:8px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg></button></div>
   </div>
   <div id="tools">
+    <button class="tool glass" id="btn-menu" aria-label="Menu"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>Menu</button>
     <button class="tool glass" id="btn-undo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 010 12h-3"/></svg>Undo</button>
     <button class="tool glass" id="btn-hint"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l3 7 7 .5-5.5 4.5 2 7.5L12 17l-6.5 4.5 2-7.5L2 9.5 9 9z"/></svg>Hint</button>
     <button class="tool glass" id="btn-sound"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5L6 9H3v6h3l5 4z"/><path id="snd-wave" d="M16 9a4 4 0 010 6M19 6a8 8 0 010 12"/></svg><span id="snd-label">Sound</span></button>

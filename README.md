@@ -43,14 +43,16 @@ Drag to turn and tilt the board, pinch to zoom out and see the cavern.
   volume preserved. Landings squash them, hops stretch them, strikes knock them sideways, and
   they wobble back. Linear shape matching gives one 3x3 transform per blob, which is exactly an
   instance matrix, so the deformation costs nothing to draw; a vertex shader adds fine ripples.
-- **Takeover effects**, one picked at random for each capture:
-  - lightning: a forking bolt with a flash of light;
-  - shockwave: a ring of light, with pieces turning as it passes;
-  - shatter: the old piece bursts into tumbling fragments;
-  - goo splash: the blobs lob goo onto a shard, which sinks into it;
-  - crystallise: crystal spikes erupt through a blob;
-  - and the classic end-over-end tumble.
-- **Board:** polished dark stone cells that glow violet (shards) or green (blobs) underneath whoever owns them.
+- **Takeover effects**, one of 15 picked at random for each capture: lightning, laser, a meteor
+  strike, a shockwave, shatter, freeze-and-smash, implode, levitate-and-slam, a vortex, fireworks
+  and the classic tumble; the shards also get a prism (daylight splitting into rainbow beams) and
+  crystallise; the blobs get goo tentacles and a goo splash.
+- **Takedowns:** a capture of four or more drops into slow motion as the camera swoops in low
+  over it, circling slowly, with letterbox bars and a shallow depth of field, then glides back.
+  Every effect runs on the game clock, so slow motion, hit-stop and fast-forward all stay in sync.
+- **Player badges:** a portrait of each side's actual 3D piece (rendered once at start-up) inside
+  a ring that fills with that side's share of the board; the side to move glows with a turning
+  border, the computer's ring spins while it thinks, and every change in score floats up ("+4").- **Board:** polished dark stone cells that glow violet (shards) or green (blobs) underneath whoever owns them.
 - **The cavern:** a skylight's shaft of daylight on the board with drifting dust, glowing crystal
   clusters (with coloured lights) on the floor, walls and floating rocks, stalactites and
   stalagmites, and an underground lake. Glowing wisps drift about using boids flocking.
