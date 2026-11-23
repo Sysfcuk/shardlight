@@ -78,6 +78,9 @@ Every piece of feedback has a job:
   low drone underneath and a hair of random detune so repeats never sound copied.
 - Buttons press with a springy scale; "reduce motion" turns the shake, hit-stop and animations
   off.
+- **Type:** Unbounded (a wide geometric display face) for the logo, headings, buttons, scores and
+  callouts; Outfit for everything else. Numbers use tabular figures so they don't jiggle while they
+  count. Both are self-hosted (`web/fonts/`, SIL Open Font License), so they also work offline.
 ## How it's built
 
 | Part | What it does |

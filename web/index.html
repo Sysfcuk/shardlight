@@ -9,9 +9,10 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;800&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
+<!-- fonts are self-hosted so they also work offline and when installed: Unbounded (display), Outfit (UI) -->
+<link rel="preload" href="fonts/Unbounded-1.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="fonts/Outfit-0.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="fonts.css">
 <script type="importmap">
 { "imports": { "three": "./vendor/three/build/three.module.js", "three/addons/": "./vendor/three/examples/jsm/" } }
 </script>
@@ -24,7 +25,11 @@
   }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { margin: 0; height: 100%; overflow: hidden; background: #0b0d18; color: var(--ink);
-    font-family: 'Nunito', ui-rounded, 'Segoe UI', system-ui, sans-serif; user-select: none; -webkit-user-select: none; }
+    font-family: 'Outfit', 'Segoe UI', system-ui, sans-serif; font-weight: 500; user-select: none; -webkit-user-select: none;
+    -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; text-rendering: optimizeLegibility; font-feature-settings: 'ss01'; }
+  /* type scale: one display face (Unbounded) for the logo, headings, buttons and callouts; Outfit for everything else.
+     Numbers use tabular figures so they don't jiggle while they count. */
+  .num, .pill .n, #result .big-score b, #result .stat b, .badge { font-variant-numeric: tabular-nums; }
   #view { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
   button { font: inherit; color: inherit; border: 0; cursor: pointer; }
   .hidden { display: none !important; }
@@ -35,12 +40,12 @@
   /* title */
   #title { align-items: center; justify-content: space-between; text-align: center; }
   #title .brand { margin-top: 7vh; }
-  #title h1 { margin: 0; font-family: 'Cinzel', serif; font-weight: 800; font-size: clamp(44px, 13vw, 84px); line-height: 1; letter-spacing: .04em;
+  #title h1 { margin: 0; font-family: 'Unbounded', sans-serif; font-weight: 800; font-size: clamp(32px, 10.4vw, 64px); line-height: 1; letter-spacing: -.01em; text-transform: uppercase;
     background: linear-gradient(180deg, #ffffff 0%, #bfe9ff 45%, #7a8cff 100%); -webkit-background-clip: text; background-clip: text; color: transparent;
     filter: drop-shadow(0 0 18px rgba(120, 200, 255, .55)) drop-shadow(0 4px 0 rgba(20, 20, 60, .8)); }
   #title p { margin: 12px 0 0; font-size: 17px; font-weight: 700; color: var(--ink-2); text-shadow: 0 2px 10px rgba(0, 0, 0, .8); }
   #title .actions { display: flex; flex-direction: column; gap: 12px; width: min(320px, 100%); margin-bottom: 4vh; }
-  .big { background: var(--gold); color: #3a2206; padding: 16px 20px; border-radius: 18px; font-family: 'Cinzel', serif; font-size: 24px; font-weight: 800; letter-spacing: .06em;
+  .big { background: var(--gold); color: #3a2206; padding: 16px 20px; border-radius: 18px; font-family: 'Unbounded', sans-serif; font-size: 20px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
     box-shadow: 0 0 0 1px rgba(255, 230, 160, .6), 0 6px 0 #7d4c14, 0 12px 30px rgba(255, 180, 60, .3); transition: transform .08s; }
   .big:active { transform: translateY(4px); box-shadow: 0 0 0 1px rgba(255, 230, 160, .6), 0 2px 0 #7d4c14; }
   .soft { padding: 13px 20px; border-radius: 16px; font-size: 17px; font-weight: 700; }
@@ -55,7 +60,7 @@
   .pill .who { width: 38px; height: 38px; border-radius: 12px; display: grid; place-items: center; flex: none; }
   .pill.bee .who { background: rgba(180, 92, 255, .18); } .pill.wasp .who { background: rgba(56, 214, 94, .16); }
   .pill .name { font-size: 12px; font-weight: 700; color: var(--ink-2); line-height: 1.05; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .pill .n { font-size: 26px; font-weight: 800; line-height: 1; }
+  .pill .n { font-family: 'Unbounded', sans-serif; font-size: 23px; font-weight: 700; line-height: 1.05; letter-spacing: -.02em; }
   .pill .txt { min-width: 0; flex: 1; }
   .pill.on { transform: translateY(-2px) scale(1.03); }
   .pill.bee.on { box-shadow: 0 0 0 2px var(--ruby), 0 0 22px rgba(180, 92, 255, .6); }
@@ -73,7 +78,7 @@
   .sheet { position: fixed; inset: 0; display: flex; align-items: flex-end; justify-content: center; background: rgba(4, 5, 14, .55); z-index: 10; padding: 16px 14px calc(var(--safe-b) + 16px); }
   .card { width: 100%; max-width: 440px; max-height: 100%; overflow-y: auto; background: rgba(18, 21, 40, .96); border: 1px solid var(--edge); border-radius: 24px; padding: 22px 20px 20px; box-shadow: 0 10px 50px rgba(0, 0, 0, .6), 0 0 0 1px rgba(255, 255, 255, .03) inset; animation: up .35s cubic-bezier(.2, 1.4, .4, 1); }
   @keyframes up { from { transform: translateY(60%); } }
-  .card h3 { margin: 0 0 12px; font-family: 'Cinzel', serif; font-size: 26px; text-align: center; letter-spacing: .04em; }
+  .card h3 { margin: 0 0 14px; font-family: 'Unbounded', sans-serif; font-weight: 700; font-size: 22px; text-align: center; letter-spacing: -.01em; }
   .card p { color: var(--ink-2); font-weight: 600; margin: 0 0 12px; line-height: 1.35; }
   .label { font-size: 12px; font-weight: 800; color: var(--ink-2); text-transform: uppercase; letter-spacing: .1em; margin: 12px 2px 6px; }
   .seg { display: flex; gap: 6px; background: rgba(255, 255, 255, .05); border: 1px solid var(--edge); padding: 4px; border-radius: 14px; }
@@ -82,7 +87,7 @@
   .row { display: flex; gap: 10px; margin-top: 18px; }
   .row button { flex: 1; padding: 14px; border-radius: 16px; font-size: 18px; font-weight: 800; background: rgba(255, 255, 255, .07); border: 1px solid var(--edge); }
   .row button.go { background: var(--gold); color: #3a2206; border: 0; box-shadow: 0 4px 0 #7d4c14; }
-  #result .big-score { display: flex; justify-content: center; gap: 22px; font-size: 40px; font-weight: 800; margin: 6px 0 2px; }
+  #result .big-score { display: flex; justify-content: center; gap: 22px; font-family: 'Unbounded', sans-serif; font-size: 34px; font-weight: 700; margin: 6px 0 2px; letter-spacing: -.02em; }
   #result .big-score span { display: flex; align-items: center; gap: 6px; }
   #howto ul { margin: 0; padding-left: 20px; color: var(--ink-2); font-weight: 600; line-height: 1.45; }
   #howto li { margin-bottom: 8px; }
@@ -140,10 +145,10 @@
   .badge.best { color: #3a2206; background: linear-gradient(180deg, #ffe7a6, #f1b54a); border-color: #ffe7a6; box-shadow: 0 0 14px rgba(255, 200, 90, .6); }
   /* combo callouts */
   #callouts { position: fixed; inset: 0; pointer-events: none; z-index: 6; overflow: hidden; }
-  .callout { position: absolute; transform: translate(-50%, -50%); text-align: center; font-family: 'Cinzel', serif; font-weight: 800; letter-spacing: .04em; white-space: nowrap;
+  .callout { position: absolute; transform: translate(-50%, -50%); text-align: center; font-family: 'Unbounded', sans-serif; font-weight: 800; letter-spacing: -.01em; white-space: nowrap;
     animation: callout 1.3s cubic-bezier(.2, .9, .3, 1) forwards; text-shadow: 0 0 18px currentColor, 0 3px 0 rgba(0, 0, 0, .6); }
   .callout b { display: block; font-size: 30px; line-height: 1; }
-  .callout span { display: block; font-size: 15px; margin-top: 4px; letter-spacing: .12em; text-transform: uppercase; }
+  .callout span { display: block; font-size: 13px; font-weight: 700; margin-top: 6px; letter-spacing: .14em; text-transform: uppercase; }
   .callout.big b { font-size: 40px; } .callout.huge b { font-size: 52px; }
   @keyframes callout { 0% { opacity: 0; transform: translate(-50%, -30%) scale(.4); } 18% { opacity: 1; transform: translate(-50%, -60%) scale(1.12); } 30% { transform: translate(-50%, -62%) scale(1); }
     75% { opacity: 1; transform: translate(-50%, -95%) scale(1); } 100% { opacity: 0; transform: translate(-50%, -125%) scale(.92); } }

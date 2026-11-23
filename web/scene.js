@@ -274,7 +274,7 @@ export function createScene(canvas, { mobile = false } = {}) {
   // screen shake ("trauma", squared, so small knocks stay subtle) and a quick zoom punch.
   const tPos = new THREE.Vector3(), tLook = new THREE.Vector3();
   const blend = { from: new THREE.Vector3(), fromLook: new THREE.Vector3(), t: 1, dur: 1.2 };
-  let trauma = 0, punch = 0;
+  let trauma = 0, punch = 0, camPlaced = false;
   const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
   function startBlend(dur = 1.2) { blend.from.copy(camera.position); blend.fromLook.copy(lastLook); blend.t = 0; blend.dur = dur; }
   const lastLook = new THREE.Vector3();
@@ -302,6 +302,7 @@ export function createScene(canvas, { mobile = false } = {}) {
       camera.position.x += Math.sin(tt * 1.1) * k; camera.position.y += Math.sin(tt * 1.7 + 1) * k * 0.6; camera.position.z += Math.sin(tt * 1.3 + 2) * k;
     }
     camera.lookAt(lastLook);
+    camPlaced = true;
     // fog starts just past the board, wherever the camera is, so zooming out never washes it out
     const cd = camera.position.length(); scene.fog.near = cd + 4; scene.fog.far = cd + 70;
   }
@@ -767,7 +768,8 @@ export function createScene(canvas, { mobile = false } = {}) {
     setHint(h) { hint = h; },
     setThinking(side) { thinking = side; },
     /** 'title' slowly circles the island; 'play' frames the board for the HUD. */
-    setView(v, pads = {}) { if (v !== view) startBlend(v === 'play' ? 1.3 : 1.6); view = v; padTop = pads.top || 0; padBottom = pads.bottom || 0; fit(); },
+    // views glide into each other, except the very first, which snaps (the camera starts at the origin, inside the board)
+    setView(v, pads = {}) { if (v !== view && camPlaced) startBlend(v === 'play' ? 1.3 : 1.6); view = v; padTop = pads.top || 0; padBottom = pads.bottom || 0; fit(); },
     /** Screen shake: amount 0..1 (adds up, capped). */
     shake(amount) { trauma = Math.min(1, trauma + amount); },
     /** A quick push of the camera toward the board. */
@@ -806,7 +808,7 @@ export function createScene(canvas, { mobile = false } = {}) {
     screenOf(i) { return toScreen(cells[i].pos); },
     get lastEffect() { return lastEffect; },
     set forceEffect(name) { forcedEffect = name || null; },
-    debug() { return { pos: camera.position.toArray(), camDist, look: look.toArray(), aspect: camera.aspect, view, tilt: { ...tilt } }; },
+    debug() { return { orbit: { ...orbit }, blendT: blend.t, tPos: tPos.toArray(), trauma, punch, pos: camera.position.toArray(), camDist, look: look.toArray(), aspect: camera.aspect, view, tilt: { ...tilt } }; },
     /** A PNG of the current frame (dev/testing). */
     snapshot() { update(performance.now()); return new Promise((r) => canvas.toBlob(r, 'image/png')); },
   };
