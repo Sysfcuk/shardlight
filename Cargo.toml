@@ -1,0 +1,18 @@
+[package]
+name = "shardlight"
+version = "0.1.0"
+edition = "2021"
+description = "Shardlight: rubies vs sapphires in a crystal cavern. Rust core compiled to WebAssembly."
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[[bin]]
+name = "selfplay"
+path = "src/bin/selfplay.rs"
+
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+panic = "abort"
