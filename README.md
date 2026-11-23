@@ -2,6 +2,8 @@
 
 **Rubies against sapphires on a stone board, deep in a crystal cavern.**
 
+▶ **[Play on your phone](https://sysfcuk.github.io/shardlight/)**: open it in Chrome or Safari and use "Add to Home Screen" to install it.
+
 Shardlight is a head-to-head hex strategy game for phones, in full 3D: an original take on the
 classic clone-and-jump hex game, with its own look. The rules and the computer opponent are Rust
 compiled to WebAssembly; the 3D world is Three.js (WebGL). It's built on the same engine as
