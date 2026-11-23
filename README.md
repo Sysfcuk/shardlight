@@ -83,6 +83,23 @@ Every piece of feedback has a job:
 - **Type:** Unbounded (a wide geometric display face) for the logo, headings, buttons, scores and
   callouts; Outfit for everything else. Numbers use tabular figures so they don't jiggle while they
   count. Both are self-hosted (`web/fonts/`, SIL Open Font License), so they also work offline.
+
+## Soundtrack
+
+The music is generated live with Web Audio (`web/music.js`), so it never loops the same way twice
+and weighs nothing to download. It's an ambient piece at 84 BPM: a slow pad, a soft arpeggio, a
+sub bass and a glass-bell hook, all sent through the same cave reverb as the sound effects.
+
+- **The hook** is a short call-and-answer phrase. The answer rises when you're ahead and falls
+  when you're behind, and the chords switch between a bright progression and its darker relative
+  minor as the lead changes.
+- **It follows the game.** A fuller board and a closer score add layers (arp, then a quiet
+  pulse). While the AI is thinking, the music dims behind a closing filter. Captures play a short
+  run quantised to the beat. Slow-motion takedowns sweep the filter, and the end of a game
+  resolves on a win, lose or draw cadence.
+- It starts on your first tap (browsers require that). Turn it off on its own under
+  *Pause → Music*, or with all sound via the speaker button.
+
 ## How it's built
 
 | Part | What it does |

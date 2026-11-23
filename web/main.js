@@ -11,6 +11,7 @@
 //  - sound sits in a space: a cave reverb on every chime and a low ambient drone underneath
 import { loadEngine, createAi, LAYOUTS, LEVELS } from './engine.js';
 import { createScene } from './scene.js';
+import { createMusic } from './music.js';
 
 const $ = (s) => document.querySelector(s);
 const MOBILE = matchMedia('(pointer: coarse)').matches;
@@ -20,6 +21,7 @@ const KEY = 'shardlight.v1';
 const save = (() => { try { return JSON.parse(localStorage.getItem(KEY)) || {}; } catch { return {}; } })();
 save.cfg ||= { mode: 'ai', level: 1, side: 0, layout: 0 };
 save.sound ??= true;
+save.music ??= true;
 save.record ||= {}; // per difficulty: { w, l, d }
 const persist = () => { try { localStorage.setItem(KEY, JSON.stringify(save)); } catch { /* private mode */ } };
 
@@ -27,11 +29,11 @@ const persist = () => { try { localStorage.setItem(KEY, JSON.stringify(save)); }
 // Everything goes through one bus: a compressor (so stacked chimes never clip), with a send to a
 // cave reverb built from decaying noise. A soft two-oscillator drone breathes underneath.
 const sfx = (() => {
-  let ac = null, bus = null, verb = null, drone = null;
+  let ac = null, bus = null, verb = null, drone = null, comp = null;
   function ctx() {
     if (ac) return ac;
     ac = new (window.AudioContext || window.webkitAudioContext)();
-    const comp = ac.createDynamicsCompressor();
+    comp = ac.createDynamicsCompressor();
     comp.threshold.value = -16; comp.ratio.value = 4;
     comp.connect(ac.destination);
     bus = ac.createGain(); bus.gain.value = 0.9; bus.connect(comp);
@@ -83,6 +85,8 @@ const sfx = (() => {
   }
   return {
     unlock() { if (!save.sound) return; ctx().resume?.(); startDrone(); },
+    /** The shared audio graph, for the music. */
+    audio() { ctx(); return { ac, comp, verb }; },
     mute(on) { if (on) { drone?.stop(); drone = null; } else { this.unlock(); } },
     tap() { chime(1320, 0, 0.045); },
     select() { chime(988, 0, 0.06); tone(1976, 0.08, { vol: 0.03, wet: 0.3 }); },
@@ -117,6 +121,9 @@ const sfx = (() => {
     count(k) { chime(1568 + k * 40, 0, 0.022); },
   };
 })();
+// the soundtrack (music.js): it plays through the same bus and cave reverb as the effects
+const music = createMusic(() => sfx.audio());
+const startMusic = () => { if (save.sound && save.music) music.start(); };
 const vibrate = (p) => {
   if (navigator.userActivation && !navigator.userActivation.hasBeenActive) return;
   try { navigator.vibrate?.(p); } catch { /* not supported */ }
@@ -130,7 +137,7 @@ const view = createScene($('#view'), { mobile: MOBILE });
 // the badge portraits are the real 3D pieces, rendered once
 try { const pics = view.portraits(); $('#ava-bee').src = pics.shards; $('#ava-wasp').src = pics.blobs; } catch { /* no WebGL for a second canvas: the ring still shows */ }
 // slow-motion takedowns get cinematic letterbox bars
-view.onCinematic((on) => $('#bars').classList.toggle('on', on && screen === 'game'));
+view.onCinematic((on) => { $('#bars').classList.toggle('on', on && screen === 'game'); music.cinematic(on); });
 // counts on the badges change when the piece lands, not when the move starts
 view.onLand(() => { if (G) G.target = [E.count(0), E.count(1)]; updateHud(); });
 
@@ -177,6 +184,12 @@ function updateHud() {
   $('#pill-wasp').style.setProperty('--p', ((b / tot) * 100).toFixed(1));
   $('#tug .a').style.width = `${(a / tot) * 100}%`;
   $('#tug .b').style.width = `${(b / tot) * 100}%`;
+  // the music follows the game: who's ahead (from your side), how full the board is, and
+  // whether the computer is thinking
+  if (!G.demo) {
+    const me = G.mode === 'ai' ? G.human : -1;
+    music.setState({ adv: me < 0 ? 0 : ((me ? b : a) - (me ? a : b)) / tot, fill: (a + b) / G.n, waiting: G.mode === 'ai' && E.winner < 0 && !isHuman(turn) });
+  }
   let status = '';
   if (E.winner >= 0) status = '';
   else if (G.mode === 'local') status = `${SIDE_NAME[turn]} to move`;
@@ -244,6 +257,7 @@ requestAnimationFrame(placeBadges);
 const WORDS = [[9, 'Shardstorm!', 'Gloopocalypse!'], [7, 'Brilliant!', 'Brilliant!'], [5, 'Great!', 'Great!'], [3, 'Nice!', 'Nice!']];
 view.onCapture(({ count, cell, side }) => {
   if (!G || G.demo) return;
+  music.capture(count, G.mode === 'local' || side === G.human);
   G.stats.caps[side] += count;
   G.stats.best[side] = Math.max(G.stats.best[side], count);
   vibrate(count >= 5 ? [18, 40, 28] : count >= 3 ? [14, 30, 14] : 10);
@@ -308,12 +322,14 @@ function gameOver() {
   view.celebrate(w === 2 ? 0 : w);
   if (G.demo) { setTimeout(() => { if (G?.demo) startDemo(); }, 3500); return; }
   let title, text, me = G.mode === 'ai' ? G.human : (w === 2 ? 0 : w);
+  if (G.mode === 'local') music.end('win');
   if (G.mode === 'local') { title = w === 2 ? 'A draw!' : `${SIDE_NAME[w]} win!`; text = w === 2 ? 'Perfectly balanced.' : `${SIDE_NAME[w]} hold ${Math.max(b, wa)} of ${b + wa} cells.`; sfx.win(); }
   else {
     const rec = (save.record[G.level] ||= { w: 0, l: 0, d: 0 });
     if (w === 2) { title = 'A draw!'; rec.d++; sfx.win(); }
     else if (w === G.human) { title = 'Victory!'; rec.w++; sfx.win(); vibrate([20, 40, 20, 40, 60]); }
     else { title = `The ${SIDE_NAME[w].toLowerCase()} win`; rec.l++; sfx.lose(); }
+    music.end(w === 2 ? 'draw' : w === G.human ? 'win' : 'lose');
     persist();
     text = `${LEVELS[G.level]} · ${LAYOUTS[G.layout]} board · your record here: ${rec.w}–${rec.l}${rec.d ? '–' + rec.d : ''}`;
   }
@@ -343,7 +359,7 @@ function countUp(el, to, side) {
 // ---------------------------------------------------------------- input
 // Dragging turns the board (scene.js handles that); only clean taps reach the game.
 const canvas = $('#view');
-canvas.addEventListener('pointerdown', () => sfx.unlock());
+canvas.addEventListener('pointerdown', () => { sfx.unlock(); startMusic(); });
 view.onTap((x, y) => {
   if (screen !== 'game' || !G) return;
   if (G.busy) { view.speed = 4; return; } // tap during a move: fast-forward
@@ -412,7 +428,10 @@ $('#btn-hint').onclick = async () => {
   select(m.from);
 };
 const syncSound = () => { $('#snd-wave').style.display = save.sound ? '' : 'none'; $('#snd-label').textContent = save.sound ? 'Sound' : 'Muted'; };
-$('#btn-sound').onclick = () => { save.sound = !save.sound; persist(); syncSound(); sfx.mute(!save.sound); sfx.tap(); };
+$('#btn-sound').onclick = () => { save.sound = !save.sound; persist(); syncSound(); sfx.mute(!save.sound); if (save.sound) startMusic(); else music.stop(); sfx.tap(); };
+const syncMusic = () => { $('#pause-music').textContent = save.music ? 'Music: on' : 'Music: off'; };
+$('#pause-music').onclick = () => { save.music = !save.music; persist(); syncMusic(); if (save.music) { sfx.unlock(); startMusic(); } else music.stop(); sfx.tap(); };
+syncMusic();
 syncSound();
 
 // ---------------------------------------------------------------- screens
@@ -430,10 +449,12 @@ function show(name) {
     setTimeout(() => { if (screen === 'title') hud.classList.add('hidden'); }, 500);
     title.classList.remove('hidden'); title.classList.remove('shown'); void title.offsetWidth; title.classList.add('shown');
     view.setView('title');
+    music.setScene('title');
   } else {
     title.classList.add('hidden'); title.classList.remove('shown');
     hud.classList.remove('hidden');
     requestAnimationFrame(() => { hud.classList.remove('off'); view.setView('play', hudPads()); });
+    music.setScene('game');
   }
 }
 addEventListener('resize', () => { if (screen === 'game') view.setView('play', hudPads()); });
@@ -464,7 +485,7 @@ document.querySelectorAll('#setup .seg').forEach((seg) => seg.addEventListener('
 }));
 function openSetup() { renderSetup(); openSheet('setup'); }
 $('#btn-play').onclick = () => {
-  sfx.unlock(); sfx.tap();
+  sfx.unlock(); startMusic(); sfx.tap();
   try { globalThis.DeviceOrientationEvent?.requestPermission?.().catch(() => {}); } catch { /* only iOS asks */ }
   openSetup();
 };
