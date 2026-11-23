@@ -129,6 +129,7 @@ export function createScene(canvas, { mobile = false } = {}) {
   const sapphireMat = blobMaterial('#38d65e', { rich: !mobile });
   const fx = createFx(scene, { mobile });
   let lastEffect = null, forcedEffect = null; // forcedEffect: for testing one effect at a time
+  let hitStop = 0, onCapture = null, selectedAt = 0;
   const GEO = { ruby: crystalClusterGeometry(), sapphire: blobGeometry() };
   // glowing wisps drift round the cavern (boids), and gather at the sapphire rock now and then
   const wispMat = new THREE.MeshBasicMaterial({ color: '#ffffff', toneMapped: false });
@@ -269,18 +270,43 @@ export function createScene(canvas, { mobile = false } = {}) {
     camera.updateProjectionMatrix();
   }
 
+  // Camera polish: views blend into each other (a dolly, not a cut), big moments add a little
+  // screen shake ("trauma", squared, so small knocks stay subtle) and a quick zoom punch.
+  const tPos = new THREE.Vector3(), tLook = new THREE.Vector3();
+  const blend = { from: new THREE.Vector3(), fromLook: new THREE.Vector3(), t: 1, dur: 1.2 };
+  let trauma = 0, punch = 0;
+  const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  function startBlend(dur = 1.2) { blend.from.copy(camera.position); blend.fromLook.copy(lastLook); blend.t = 0; blend.dur = dur; }
+  const lastLook = new THREE.Vector3();
+
   function placeCamera(dt) {
     tilt.x += (tilt.wx - tilt.x) * Math.min(1, dt * 2.5);
     tilt.y += (tilt.wy - tilt.y) * Math.min(1, dt * 2.5);
     if (view === 'title') {
       const a = clockT * 0.07;
       const d = camDist * 1.08, e = 0.62;
-      camera.position.set(Math.sin(a) * d * Math.cos(e), d * Math.sin(e) + 1, Math.cos(a) * d * Math.cos(e));
-      camera.lookAt(0, -0.8, 0);
+      tPos.set(Math.sin(a) * d * Math.cos(e), d * Math.sin(e) + 1, Math.cos(a) * d * Math.cos(e));
+      tLook.set(0, -0.8, 0);
       camAzimuth = a;
-      scene.fog.near = d + 4; scene.fog.far = d + 70;
-      return;
+    } else playPose(dt);
+    // blend from wherever the camera was (smootherstep), then shake and punch on top
+    let e = 1;
+    if (blend.t < 1) { blend.t = Math.min(1, blend.t + dt / blend.dur); const u = blend.t; e = u * u * u * (u * (u * 6 - 15) + 10); }
+    camera.position.lerpVectors(blend.from, tPos, e);
+    lastLook.lerpVectors(blend.fromLook, tLook, e);
+    punch = Math.max(0, punch - dt * 3);
+    if (punch > 0) camera.position.lerp(lastLook, Math.sin(punch * Math.PI) * 0.035);
+    trauma = Math.max(0, trauma - dt * 1.8);
+    if (trauma > 0 && !reduceMotion) {
+      const k = trauma * trauma * 0.28, tt = clockT * 38;
+      camera.position.x += Math.sin(tt * 1.1) * k; camera.position.y += Math.sin(tt * 1.7 + 1) * k * 0.6; camera.position.z += Math.sin(tt * 1.3 + 2) * k;
     }
+    camera.lookAt(lastLook);
+    // fog starts just past the board, wherever the camera is, so zooming out never washes it out
+    const cd = camera.position.length(); scene.fog.near = cd + 4; scene.fog.far = cd + 70;
+  }
+
+  function playPose(dt) {
     if (orbit.resetting) {
       const k = Math.min(1, dt * 6);
       orbit.yaw += (Math.atan2(Math.sin(-orbit.yaw), Math.cos(-orbit.yaw))) * k;
@@ -294,11 +320,9 @@ export function createScene(canvas, { mobile = false } = {}) {
     const yaw = orbit.yaw + tilt.x * 0.12, e = clampElev(orbit.elev - tilt.y * 0.05), d = camDist * orbit.zoom;
     const s = lookShift * orbit.zoom;
     look.set(-Math.sin(yaw) * s, 0, -Math.cos(yaw) * s);
-    camera.position.set(look.x + Math.sin(yaw) * d * Math.cos(e), d * Math.sin(e), look.z + Math.cos(yaw) * d * Math.cos(e));
-    camera.lookAt(look);
+    tPos.set(look.x + Math.sin(yaw) * d * Math.cos(e), d * Math.sin(e), look.z + Math.cos(yaw) * d * Math.cos(e));
+    tLook.copy(look);
     camAzimuth = yaw;
-    // fog starts just past the board, wherever the camera is, so zooming out never washes it out
-    const cd = camera.position.length(); scene.fog.near = cd + 4; scene.fog.far = cd + 70;
   }
   let camAzimuth = 0;
   const clampElev = (e) => Math.min(1.28, Math.max(0.45, e)); // never quite flat-on, never below the rim
@@ -476,12 +500,23 @@ export function createScene(canvas, { mobile = false } = {}) {
     const dst = actors[move.to];
     Object.assign(dst, { type, scale: 1, hopAt: clockT, land: true, jelly: null, yaw: Math.atan2(-(cells[move.to].pos.z - cells[move.from].pos.z), cells[move.to].pos.x - cells[move.from].pos.x) });
     sfx.land?.(side);
-    burst(tmpV.copy(cells[move.to].pos).setY(0.1), ['#fff3c0'], 8, { up: 1, spread: 1.4, gravity: 0.3 });
+    // landing: a soft ring of dust, and a little weight in the camera
+    fx.shockwave(cells[move.to].pos, 0.95, 3.2 * speed, '#c9d6ff');
+    burst(tmpV.copy(cells[move.to].pos).setY(0.1), ['#fff3c0', '#c9d6ff'], 10, { up: 1, spread: 1.6, gravity: 0.3 });
+    trauma = Math.min(1, trauma + 0.08);
     // neighbours switch sides, with a takeover effect picked at random for this capture
     const from = cells[move.to].pos;
     const pool = TAKEOVERS[side === 0 ? 'shards' : 'blobs'];
     const effect = res.flips.length ? (forcedEffect || pool[(Math.random() * pool.length) | 0]) : null;
     lastEffect = effect;
+    if (res.flips.length) {
+      // impact: a beat of hit-stop, shake and a zoom punch that grow with the size of the capture
+      const nFlips = res.flips.length;
+      hitStop = Math.min(0.12, 0.04 + nFlips * 0.015);
+      trauma = Math.min(1, trauma + 0.12 + nFlips * 0.07);
+      if (nFlips >= 3) punch = 1;
+      onCapture?.({ count: nFlips, cell: move.to, side, effect });
+    }
     if (effect === 'shockwave') {
       // one ring for the whole capture; each piece turns as the ring reaches it
       const speedW = 7, maxR = Math.max(...res.flips.map((i) => cells[i].pos.distanceTo(from))) + 0.8;
@@ -600,7 +635,9 @@ export function createScene(canvas, { mobile = false } = {}) {
   function update(now) {
     const rdt = Math.min(0.05, Math.max(0, (now - last) / 1000)); last = now;
     watchPerformance(rdt);
-    const dt = rdt * speed;
+    // hit-stop: the world freezes for a beat on impact (the camera keeps breathing)
+    let dt = rdt * speed;
+    if (hitStop > 0) { hitStop -= rdt; dt = reduceMotion ? dt : 0; }
     clockT += dt;
     const t = clockT;
     placeCamera(rdt);
@@ -631,7 +668,12 @@ export function createScene(canvas, { mobile = false } = {}) {
         meshes.rings.setMatrixAt(r, M); meshes.rings.setColorAt(r, color); r++;
       };
       const pulse = 1 + Math.sin(t * 7) * 0.06;
-      for (const tg of targets) ring(tg.to, tg.fly ? COLORS.fly : COLORS.buzz, (tg.fly ? 0.82 : 1) * pulse);
+      // targets pop in one after another (splits first, then leaps), with a little overshoot
+      targets.forEach((tg, k) => {
+        const u = clamp01((t - selectedAt - (tg.fly ? 0.08 : 0) - k * 0.025) / 0.22);
+        const pop = u < 1 ? Math.sin(u * Math.PI * 0.5) * (1 + 0.25 * Math.sin(u * Math.PI)) : 1;
+        if (pop > 0.01) ring(tg.to, tg.fly ? COLORS.fly : COLORS.buzz, (tg.fly ? 0.82 : 1) * pulse * pop);
+      });
       if (hint) { ring(hint.from, COLORS.hint, 1.15 + Math.sin(t * 6) * 0.08); ring(hint.to, COLORS.hint, 1.25 + Math.sin(t * 6) * 0.1); }
       if (lastMove && t - lastMove.at < 1.6 && sel < 0) ring(lastMove.to, new THREE.Color(1, 1, 1).multiplyScalar(1 - (t - lastMove.at) / 1.6), 1.1);
       meshes.rings.count = r;
@@ -720,14 +762,33 @@ export function createScene(canvas, { mobile = false } = {}) {
     playMove,
     celebrate,
     /** Highlight a piece and its targets ([{to, fly}]). */
-    select(i, list) { sel = i; targets = list || []; if (i >= 0) actors[i].hopAt = clockT; },
+    select(i, list) { sel = i; targets = list || []; selectedAt = clockT; if (i >= 0) actors[i].hopAt = clockT; },
     clearSelect() { sel = -1; targets = []; },
     setHint(h) { hint = h; },
     setThinking(side) { thinking = side; },
     /** 'title' slowly circles the island; 'play' frames the board for the HUD. */
-    setView(v, pads = {}) { view = v; padTop = pads.top || 0; padBottom = pads.bottom || 0; fit(); },
+    setView(v, pads = {}) { if (v !== view) startBlend(v === 'play' ? 1.3 : 1.6); view = v; padTop = pads.top || 0; padBottom = pads.bottom || 0; fit(); },
+    /** Screen shake: amount 0..1 (adds up, capped). */
+    shake(amount) { trauma = Math.min(1, trauma + amount); },
+    /** A quick push of the camera toward the board. */
+    punch() { punch = 1; },
     /** Called with (clientX, clientY) for a tap that wasn't a drag or pinch. */
     onTap(fn) { onTap = fn; },
+    /** Called with { count, cell, side, effect } the moment a capture lands. */
+    onCapture(fn) { onCapture = fn; },
+    /**
+     * Compile every shader the game will need before the player sees anything, so the first
+     * capture doesn't hitch while lightning or fragments compile. Fires each effect once, out of
+     * sight, then renders a frame.
+     */
+    async prewarm() {
+      const away = new THREE.Vector3(0, -40, 0);
+      fx.lightning(away, away.clone().add(new THREE.Vector3(1, 0, 0)));
+      fx.shatter(away, ['#ffffff']); fx.splash(away, away, 0.1, 2); fx.crystallise(away, ['#ffffff'], 2); fx.shockwave(away, 0.5, 1, '#ffffff');
+      fx.update(0.001);
+      try { await renderer.compileAsync(scene, camera); } catch { /* older drivers: compile on first use */ }
+      update(performance.now());
+    },
     /** Called with true when the player has turned/zoomed away from the default view, false when back. */
     onViewChange(fn) { onViewChange = fn; },
     /** Glide back to the default view. */

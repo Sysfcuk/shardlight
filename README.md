@@ -57,6 +57,27 @@ Drag to turn and tilt the board, pinch to zoom out and see the cavern.
 - **Post effects:** bloom for the glow, and a tilt-shift blur that keeps the board sharp. If frames
   run slow on a phone, the game drops the blur, softens the bloom and lowers the resolution.
 
+## Polish
+
+Every piece of feedback has a job:
+
+- **The board explains itself.** Pick a piece and every target shows what it would win (`+3`),
+  the best in gold, worked out on a scratch copy of the rules engine. A leap that wins nothing
+  gets no badge.
+- **Big plays feel big, small ones stay quiet.** A capture freezes the world for a beat
+  (hit-stop), shakes the camera ("trauma", squared, so small knocks stay subtle) and buzzes the
+  phone, all scaled to its size. Three or more pushes the camera in and pops a callout
+  ("+5 Great!"), with a rising arpeggio. Every landing kicks up a ring of dust.
+- **Nothing pops.** A branded loader covers the start while every shader compiles out of sight
+  (so the first lightning bolt doesn't stutter). Then the title rises in line by line, the
+  camera dollies between the title orbit and the board instead of cutting, the HUD slides in
+  from the edges, sheets slide away, and targets pop in one after another.
+- **Numbers count, never jump**, and a territory bar under the scores shows who's ahead.
+- **The results screen** counts the scores up and shows your captures, best combo and moves.
+- **Sound sits in a space:** every chime goes through a cave reverb and a compressor, with a
+  low drone underneath and a hair of random detune so repeats never sound copied.
+- Buttons press with a springy scale; "reduce motion" turns the shake, hit-stop and animations
+  off.
 ## How it's built
 
 | Part | What it does |

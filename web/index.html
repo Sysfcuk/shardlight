@@ -87,6 +87,81 @@
   #howto ul { margin: 0; padding-left: 20px; color: var(--ink-2); font-weight: 600; line-height: 1.45; }
   #howto li { margin-bottom: 8px; }
   #howto b { color: var(--ink); }
+
+  /* ---------- polish ---------- */
+  /* every button: a springy press and a quick release */
+  button { transition: transform .12s cubic-bezier(.3, 1.6, .5, 1), box-shadow .2s, background .2s, opacity .2s; }
+  button:active:not(:disabled) { transform: scale(.95); }
+  button:focus-visible { outline: 2px solid var(--glow); outline-offset: 3px; }
+
+  /* boot: a branded loader that fades away once the world is ready */
+  #boot { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; text-align: center; background: radial-gradient(ellipse at 50% 40%, #1b2142, #07080f 70%); transition: opacity .7s ease, visibility .7s; }
+  #boot.done { opacity: 0; visibility: hidden; }
+  #boot .mark { width: 92px; height: 92px; animation: bootspin 2.4s cubic-bezier(.6, 0, .4, 1) infinite; filter: drop-shadow(0 0 22px rgba(143, 233, 255, .5)); }
+  @keyframes bootspin { 0% { transform: rotate(0) scale(1); } 50% { transform: rotate(180deg) scale(.9); } 100% { transform: rotate(360deg) scale(1); } }
+  #boot .bar { width: 140px; height: 3px; margin: 22px auto 0; border-radius: 3px; background: rgba(255, 255, 255, .08); overflow: hidden; }
+  #boot .bar i { display: block; height: 100%; width: 40%; border-radius: 3px; background: linear-gradient(90deg, transparent, var(--glow), transparent); animation: bootbar 1.1s ease-in-out infinite; }
+  @keyframes bootbar { from { transform: translateX(-100%); } to { transform: translateX(260%); } }
+
+  /* title: a light sweep across the logo, and everything rises in, one after another */
+  #title h1 { background-size: 220% 100%; background-image: linear-gradient(100deg, #ffffff 0%, #bfe9ff 30%, #ffffff 42%, #bfe9ff 50%, #7a8cff 100%); animation: sheen 5s ease-in-out infinite; }
+  @keyframes sheen { 0%, 60% { background-position: 100% 0; } 100% { background-position: -100% 0; } }
+  #title.shown h1.rise { animation: rise .7s cubic-bezier(.2, .9, .3, 1) forwards, sheen 5s ease-in-out .8s infinite; }
+  .rise { opacity: 0; transform: translateY(18px); }
+  .shown .rise { animation: rise .7s cubic-bezier(.2, .9, .3, 1) forwards; }
+  .shown .rise.d1 { animation-delay: .12s; } .shown .rise.d2 { animation-delay: .26s; } .shown .rise.d3 { animation-delay: .38s; } .shown .rise.d4 { animation-delay: .5s; }
+  @keyframes rise { to { opacity: 1; transform: none; } }
+  .big { position: relative; overflow: hidden; }
+  .big::after { content: ''; position: absolute; inset: 0; background: linear-gradient(100deg, transparent 30%, rgba(255, 255, 255, .55) 50%, transparent 70%); transform: translateX(-120%); animation: glint 3.6s ease-in-out 1.2s infinite; pointer-events: none; }
+  @keyframes glint { 0%, 70% { transform: translateX(-120%); } 100% { transform: translateX(120%); } }
+
+  /* the hud slides in from the edges */
+  #hud > div:first-child { transition: transform .55s cubic-bezier(.2, .9, .3, 1), opacity .55s; }
+  #tools { transition: transform .55s cubic-bezier(.2, .9, .3, 1) .08s, opacity .55s .08s; }
+  #hud.off > div:first-child { transform: translateY(-120%); opacity: 0; }
+  #hud.off #tools { transform: translateY(140%); opacity: 0; }
+  .pill .n { display: inline-block; transition: transform .25s cubic-bezier(.3, 1.8, .5, 1); }
+  .pill .n.bump { transform: scale(1.35); }
+  /* territory: who holds more of the board, at a glance */
+  #tug { position: relative; height: 6px; margin: 8px 2px 0; border-radius: 6px; overflow: hidden; background: rgba(255, 255, 255, .06); display: flex; }
+  #tug i { display: block; height: 100%; transition: width .6s cubic-bezier(.2, .9, .3, 1); }
+  #tug .a { background: linear-gradient(90deg, #7d3cff, #b45cff); box-shadow: 0 0 12px rgba(180, 92, 255, .7); }
+  #tug .b { background: linear-gradient(90deg, #2bd15a, #7dffa0); box-shadow: 0 0 12px rgba(56, 214, 94, .6); margin-left: auto; }
+  #status .dots i { display: inline-block; animation: dot 1.2s infinite; font-style: normal; }
+  #status .dots i:nth-child(2) { animation-delay: .2s; } #status .dots i:nth-child(3) { animation-delay: .4s; }
+  @keyframes dot { 0%, 60%, 100% { opacity: .2; transform: translateY(0); } 30% { opacity: 1; transform: translateY(-2px); } }
+  #status.swap { animation: swap .35s ease; }
+  @keyframes swap { 0% { opacity: 0; transform: translateY(6px) scale(.96); } 100% { opacity: 1; transform: none; } }
+
+  /* capture previews: "+3" over each target, the best one in gold */
+  #badges { position: fixed; inset: 0; pointer-events: none; z-index: 4; }
+  .badge { position: absolute; left: 0; top: 0; padding: 2px 7px; border-radius: 9px; font-size: 13px; font-weight: 800; color: #e8f6ff; white-space: nowrap;
+    background: rgba(10, 14, 30, .8); border: 1px solid rgba(143, 233, 255, .35); transition: opacity .2s; }
+  .badge.best { color: #3a2206; background: linear-gradient(180deg, #ffe7a6, #f1b54a); border-color: #ffe7a6; box-shadow: 0 0 14px rgba(255, 200, 90, .6); }
+  /* combo callouts */
+  #callouts { position: fixed; inset: 0; pointer-events: none; z-index: 6; overflow: hidden; }
+  .callout { position: absolute; transform: translate(-50%, -50%); text-align: center; font-family: 'Cinzel', serif; font-weight: 800; letter-spacing: .04em; white-space: nowrap;
+    animation: callout 1.3s cubic-bezier(.2, .9, .3, 1) forwards; text-shadow: 0 0 18px currentColor, 0 3px 0 rgba(0, 0, 0, .6); }
+  .callout b { display: block; font-size: 30px; line-height: 1; }
+  .callout span { display: block; font-size: 15px; margin-top: 4px; letter-spacing: .12em; text-transform: uppercase; }
+  .callout.big b { font-size: 40px; } .callout.huge b { font-size: 52px; }
+  @keyframes callout { 0% { opacity: 0; transform: translate(-50%, -30%) scale(.4); } 18% { opacity: 1; transform: translate(-50%, -60%) scale(1.12); } 30% { transform: translate(-50%, -62%) scale(1); }
+    75% { opacity: 1; transform: translate(-50%, -95%) scale(1); } 100% { opacity: 0; transform: translate(-50%, -125%) scale(.92); } }
+
+  /* sheets: slide away, not just vanish */
+  .sheet { transition: background .3s; backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); }
+  .sheet.closing { background: rgba(4, 5, 14, 0); }
+  .sheet.closing .card { animation: down .28s cubic-bezier(.5, 0, .8, .4) forwards; }
+  @keyframes down { to { transform: translateY(110%); opacity: .6; } }
+
+  /* results */
+  #result .winner { width: 76px; height: 76px; margin: 0 auto 6px; display: block; animation: winpulse 2s ease-in-out infinite; filter: drop-shadow(0 0 18px rgba(255, 220, 150, .55)); }
+  @keyframes winpulse { 50% { transform: scale(1.08) rotate(-4deg); } }
+  #result .stats { display: flex; justify-content: center; gap: 10px; margin: 10px 0 4px; }
+  #result .stat { flex: 1; max-width: 120px; padding: 8px 6px; border-radius: 14px; background: rgba(255, 255, 255, .05); border: 1px solid var(--edge); text-align: center; opacity: 0; transform: translateY(10px); }
+  #result .stat.in { animation: rise .5s cubic-bezier(.2, .9, .3, 1) forwards; }
+  #result .stat b { display: block; font-size: 22px; } #result .stat small { font-size: 11px; font-weight: 800; color: var(--ink-2); text-transform: uppercase; letter-spacing: .08em; }
+  @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; } }
   #toast { position: fixed; left: 50%; top: 42%; transform: translate(-50%, -50%); background: rgba(10, 12, 26, .9); border: 1px solid var(--edge); color: #fff; padding: 10px 18px; border-radius: 14px; font-weight: 700; z-index: 20; pointer-events: none; transition: opacity .3s; text-align: center; }
 </style>
 </head>
@@ -108,25 +183,30 @@
     <circle cx="26" cy="27" r="1.8" fill="#b6ffbf" opacity=".85"/><circle cx="22" cy="31" r="1" fill="#b6ffbf" opacity=".7"/>
   </symbol></svg><canvas id="view"></canvas>
 
+<div id="boot"><div><svg class="mark" viewBox="0 0 40 40"><use href="#i-bee"/></svg><div class="bar"><i></i></div></div></div>
+<div id="badges"></div>
+<div id="callouts"></div>
+
 <section id="title" class="layer">
   <div class="brand">
-    <h1>Shardlight</h1>
-    <p>Shards against blobs, deep in the crystal caves.</p>
+    <h1 class="rise">Shardlight</h1>
+    <p class="rise d1">Shards against blobs, deep in the crystal caves.</p>
   </div>
   <div class="actions">
-    <button class="big" id="btn-play">Play</button>
-    <button class="soft glass" id="btn-howto">How to play</button>
-    <span id="record"></span>
+    <button class="big rise d2" id="btn-play">Play</button>
+    <button class="soft glass rise d3" id="btn-howto">How to play</button>
+    <span id="record" class="rise d4"></span>
   </div>
 </section>
 
-<section id="hud" class="layer hidden">
+<section id="hud" class="layer hidden off">
   <div>
     <div id="scores">
       <button class="icon-btn glass" id="btn-menu" aria-label="Menu"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
       <div class="pill bee glass" id="pill-bee"><span class="who"><svg class="ico" viewBox="0 0 40 40"><use href="#i-bee"/></svg></span><span class="txt"><span class="name" id="name-bee">Shards</span><br><span class="n" id="n-bee">3</span></span></div>
       <div class="pill wasp glass" id="pill-wasp"><span class="who"><svg class="ico" viewBox="0 0 40 40"><use href="#i-wasp"/></svg></span><span class="txt"><span class="name" id="name-wasp">Blobs</span><br><span class="n" id="n-wasp">3</span></span></div>
     </div>
+    <div id="tug"><i class="a" style="width:50%"></i><i class="b" style="width:50%"></i></div>
     <div style="display:flex;justify-content:center;align-items:center;gap:8px"><span id="status">Your move</span>
       <button class="icon-btn glass hidden" id="btn-view" aria-label="Recentre the board" style="width:36px;height:36px;border-radius:12px;margin-top:8px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg></button></div>
   </div>
@@ -153,8 +233,14 @@
 </div></div>
 
 <div id="result" class="sheet hidden"><div class="card">
+  <svg class="winner" viewBox="0 0 40 40"><use id="winner-icon" href="#i-bee"/></svg>
   <h3 id="result-title"></h3>
   <div class="big-score"><span><svg class="ico" viewBox="0 0 40 40"><use href="#i-bee"/></svg> <b id="r-bee"></b></span><span><svg class="ico" viewBox="0 0 40 40"><use href="#i-wasp"/></svg> <b id="r-wasp"></b></span></div>
+  <div class="stats">
+    <div class="stat"><b id="st-caps">0</b><small id="st-caps-l">Captured</small></div>
+    <div class="stat"><b id="st-best">0</b><small>Best combo</small></div>
+    <div class="stat"><b id="st-moves">0</b><small>Moves</small></div>
+  </div>
   <p id="result-text" style="text-align:center"></p>
   <div class="row"><button id="result-menu">Menu</button><button class="go" id="result-again">Play again</button></div>
 </div></div>

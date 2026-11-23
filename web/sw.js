@@ -1,5 +1,5 @@
 // Offline support: network first (so updates show straight away), cached copy when offline.
-const CACHE = 'shardlight-v2';
+const CACHE = 'shardlight-v3';
 const J = './vendor/three/examples/jsm/';
 const CORE = ['./', './index.html', './main.js', './engine.js', './ai.worker.js', './scene.js', './models.js', './world.js', './swarm.js', './jelly.js', './fx.js', './shardlight.wasm',
   './vendor/three/build/three.module.js', J + 'environments/RoomEnvironment.js', J + 'utils/BufferGeometryUtils.js',
