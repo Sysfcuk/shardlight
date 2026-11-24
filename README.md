@@ -28,7 +28,7 @@ On a phone on the same Wi-Fi, open `http://<your-pc's-ip>:8140`.
 - If the side to move can't move, the game ends and every empty cell goes to the other side.
   The game also ends when the board is full or one side is wiped out. **Most cells wins.**
 
-Play the computer (Easy, Medium, Hard or Expert, as either side) or a friend on the same phone,
+Play the computer (Very easy, Easy, Medium, Hard or Expert, as either side) or a friend on the same phone,
 on four boards: Classic, Quick, Open and Flower. Undo is free, and Hint asks the AI for a good move.
 Drag to turn and tilt the board, pinch to zoom out and see the cavern.
 

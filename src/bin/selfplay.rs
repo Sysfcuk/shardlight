@@ -9,9 +9,9 @@ use std::time::Instant;
 
 fn main() {
     let games: u32 = std::env::args().nth(1).and_then(|a| a.parse().ok()).unwrap_or(4);
-    let names = ["Easy", "Medium", "Hard", "Expert"];
-    let mut slowest = [0f64; 4];
-    for (strong, weak) in [(1, 0), (2, 1), (3, 2)] {
+    let names = ["Easy", "Medium", "Hard", "Expert", "V.easy"];
+    let mut slowest = [0f64; 5];
+    for (strong, weak) in [(0, 4), (1, 0), (2, 1), (3, 2)] {
         let mut score = 0.0;
         let mut n = 0;
         for layout in [Layout::Classic, Layout::Quick, Layout::Open, Layout::Flower] {

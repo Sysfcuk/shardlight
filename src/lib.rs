@@ -117,7 +117,7 @@ pub extern "C" fn hw_set_state(b0: u32, b1: u32, b2: u32, b3: u32, w0: u32, w1: 
     });
 }
 
-/// The AI's move for the side to move: `from << 8 | to`, or -1. level 0 Easy .. 3 Expert.
+/// The AI's move for the side to move: `from << 8 | to`, or -1. level 0 Easy .. 3 Expert, 4 Very easy.
 #[no_mangle]
 pub extern "C" fn hw_ai(level: u32, seed: u32) -> i32 {
     with_game(-1, |g| {

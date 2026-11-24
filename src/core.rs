@@ -278,6 +278,8 @@ pub fn difficulty(level: u32) -> (u32, u64, i32) {
         0 => (1, 50_000, 3),         // Easy: greedy-ish, with mistakes
         1 => (2, 200_000, 1),        // Medium
         2 => (4, 600_000, 0),        // Hard
+        4 => (1, 20_000, 7),         // Very easy (listed first): no look-ahead and a big wobble, so it
+                                     // often passes up captures and makes loose jumps
         _ => (7, 1_500_000, 0),      // Expert: as deep as the budget allows (about 0.5 s on a PC, a second or two on a phone)
     }
 }

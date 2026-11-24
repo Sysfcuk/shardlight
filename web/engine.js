@@ -3,7 +3,7 @@
 
 export const EMPTY = 0, BEE = 1, WASP = 2;            // what hw_piece returns
 export const LAYOUTS = ['Classic', 'Quick', 'Open', 'Flower'];
-export const LEVELS = ['Easy', 'Medium', 'Hard', 'Expert'];
+export const LEVELS = ['Easy', 'Medium', 'Hard', 'Expert', 'Very easy']; // 4 was added later, so saved records keep their numbers
 
 export async function loadEngine(url = new URL('./shardlight.wasm', import.meta.url)) {
   const res = await fetch(url);
