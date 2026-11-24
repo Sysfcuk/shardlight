@@ -83,6 +83,12 @@ Every piece of feedback has a job:
 - **Type:** Unbounded (a wide geometric display face) for the logo, headings, buttons, scores and
   callouts; Outfit for everything else. Numbers use tabular figures so they don't jiggle while they
   count. Both are self-hosted (`web/fonts/`, SIL Open Font License), so they also work offline.
+- **The ending gets a moment.** Before the results, a few seconds of finale (tap to skip): the HUD
+  steps aside for letterbox bars and a big title. A win cranes the camera up into a slow orbit
+  while your pieces hop in waves, light rings pulse through your cells and fireworks launch from
+  them, ending in a barrage. A loss sinks the camera low as your side's lights go out one by one,
+  your pieces stop and slump, the light dims and ash drifts down. A draw gets a gentler show for
+  both sides.
 
 ## Soundtrack
 

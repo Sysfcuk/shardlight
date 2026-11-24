@@ -150,6 +150,7 @@ const isHuman = (side) => G.mode === 'local' || side === G.human;
 const SIDE_NAME = ['Shards', 'Blobs'];
 
 function newGame({ layout, mode, level, human, demo = false }) {
+  hideFinaleBanner();
   const cells = E.newGame(layout);
   E2.newGame(layout);
   G = { layout, mode, level, human, demo, n: cells.length, busy: false, selected: -1, targets: [], token: (G?.token || 0) + 1, hint: null,
@@ -319,8 +320,11 @@ function gameOver() {
   const w = E.winner;
   const [b, wa] = [E.count(0), E.count(1)];
   view.setThinking(-1);
-  view.celebrate(w === 2 ? 0 : w);
-  if (G.demo) { setTimeout(() => { if (G?.demo) startDemo(); }, 3500); return; }
+  if (G.demo) { view.celebrate(w === 2 ? 0 : w); setTimeout(() => { if (G?.demo) startDemo(); }, 3500); return; }
+  // the finale plays first (a few seconds, tap to skip), then the results slide up
+  const kind = w === 2 ? 'draw' : G.mode === 'local' || w === G.human ? 'win' : 'lose';
+  const show = view.finale(kind, w === 2 ? 0 : w, sfx);
+  finaleBanner(kind, G.mode === 'local' && w !== 2 ? `${SIDE_NAME[w]} win` : { win: 'Victory', lose: 'Defeat', draw: 'Draw' }[kind], `${b} – ${wa}`);
   let title, text, me = G.mode === 'ai' ? G.human : (w === 2 ? 0 : w);
   if (G.mode === 'local') music.end('win');
   if (G.mode === 'local') { title = w === 2 ? 'A draw!' : `${SIDE_NAME[w]} win!`; text = w === 2 ? 'Perfectly balanced.' : `${SIDE_NAME[w]} hold ${Math.max(b, wa)} of ${b + wa} cells.`; sfx.win(); }
@@ -339,12 +343,34 @@ function gameOver() {
   $('#st-caps-l').textContent = G.mode === 'ai' ? 'You captured' : 'Captures';
   const stats = G.mode === 'ai' ? [G.stats.caps[me], G.stats.best[me], G.stats.moves[me]] : [G.stats.caps[0] + G.stats.caps[1], Math.max(...G.stats.best), G.stats.moves[0] + G.stats.moves[1]];
   ['#st-caps', '#st-best', '#st-moves'].forEach((id, k) => { $(id).textContent = stats[k]; });
-  setTimeout(() => {
+  const token = G.token;
+  let skip;
+  const skipped = new Promise((r) => { skip = r; });
+  setTimeout(() => window.addEventListener('pointerdown', skip, { once: true, capture: true }), 600); // not the winning tap itself
+  Promise.race([show, skipped]).then(() => {
+    window.removeEventListener('pointerdown', skip, { capture: true });
+    hideFinaleBanner();
+    if (!G || G.token !== token) return; // a new game started meanwhile
     openSheet('result');
     // the scores count up; the stat cards rise in one after another
     countUp($('#r-bee'), b, 0); countUp($('#r-wasp'), wa, 1);
     document.querySelectorAll('#result .stat').forEach((s, k) => { s.classList.remove('in'); setTimeout(() => s.classList.add('in'), 500 + k * 110); });
-  }, 1400);
+  });
+}
+/** The big title over the finale: letters drop in one by one, with the score beneath. */
+function finaleBanner(kind, title, score) {
+  const el = $('#finale');
+  el.className = kind;
+  document.body.classList.add('finale'); $('#bars').classList.add('on'); // the HUD steps aside; letterbox
+  $('#finale-title').innerHTML = [...title].map((ch, k) => `<span style="--k:${k}">${ch === ' ' ? '&nbsp;' : ch}</span>`).join('');
+  $('#finale-score').textContent = score;
+}
+function hideFinaleBanner() {
+  const el = $('#finale');
+  if (!el.className || el.classList.contains('out')) return;
+  el.classList.add('out');
+  document.body.classList.remove('finale'); $('#bars').classList.remove('on');
+  setTimeout(() => { if (el.classList.contains('out')) el.className = ''; }, 400);
 }
 function countUp(el, to, side) {
   let v = 0; el.textContent = 0;

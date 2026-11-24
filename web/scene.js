@@ -77,6 +77,7 @@ export function createScene(canvas, { mobile = false } = {}) {
   scene.environmentIntensity = 0.45;
   scene.add(new THREE.HemisphereLight('#7d8cc7', '#1a1024', 0.42));
   const sun = new THREE.DirectionalLight('#e8f1ff', 2.3); // the skylight
+  const SUN0 = sun.intensity;
   sun.position.set(1.5, 20, 2.5);
   sun.castShadow = true;
   sun.shadow.mapSize.set(mobile ? 1024 : 2048, mobile ? 1024 : 2048);
@@ -190,6 +191,7 @@ export function createScene(canvas, { mobile = false } = {}) {
 
   function setBoard(cellList, pieces) {
     gen++;
+    if (fin) { fin = null; startBlend(1.2); }
     if (meshes) for (const m of Object.values(meshes)) { board.remove(m); m.dispose?.(); }
     n = cellList.length;
     cells = cellList.map(({ q, r }) => ({ pos: axialToWorld(q, r) }));
@@ -289,6 +291,14 @@ export function createScene(canvas, { mobile = false } = {}) {
       tLook.set(0, -0.8, 0);
       camAzimuth = a;
     } else playPose(dt);
+    if (fin && !reduceMotion && view !== 'title') {
+      // the finale: a win cranes up into a slow victory orbit (room for the fireworks); a loss
+      // sinks low and close over the fallen side, barely moving
+      const u = clockT - fin.t0, win = fin.kind !== 'lose';
+      const y = fin.yaw0 + u * (win ? 0.2 : 0.04), d = camDist * (win ? 0.95 : 0.78), el = win ? 0.62 : 0.36;
+      tPos.set(fin.look.x + Math.sin(y) * d * Math.cos(el), d * Math.sin(el), fin.look.z + Math.cos(y) * d * Math.cos(el));
+      tLook.copy(fin.look).setY(win ? 1.6 : 0);
+    }
     if (cine) {
       // takedown: low and close over the capture, circling slowly (in slow time)
       const y = cine.yaw + (clockT - cine.t0) * 0.9, d = 6.4, el = 0.48;
@@ -423,12 +433,16 @@ export function createScene(canvas, { mobile = false } = {}) {
   }
 
   // ---------------------------------------------------------------- particles
-  const PMAX = 700;
+  const PMAX = 1600;
   const pGeo = new THREE.BufferGeometry();
-  const pPos = new Float32Array(PMAX * 3), pCol = new Float32Array(PMAX * 3);
+  const pPos = new Float32Array(PMAX * 3), pCol = new Float32Array(PMAX * 3), pSize = new Float32Array(PMAX).fill(1);
   pGeo.setAttribute('position', new THREE.BufferAttribute(pPos, 3));
   pGeo.setAttribute('color', new THREE.BufferAttribute(pCol, 3));
-  const points = new THREE.Points(pGeo, new THREE.PointsMaterial({ size: 0.11, map: radialTex(), vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false }));
+  pGeo.setAttribute('aSize', new THREE.BufferAttribute(pSize, 1));
+  const pMat = new THREE.PointsMaterial({ size: 0.11, map: radialTex(), vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false });
+  // per-particle size (firework sparks are bigger than impact sparks)
+  pMat.onBeforeCompile = (sh) => { sh.vertexShader = 'attribute float aSize;\n' + sh.vertexShader.replace('gl_PointSize = size;', 'gl_PointSize = size * aSize;'); };
+  const points = new THREE.Points(pGeo, pMat);
   points.frustumCulled = false;
   scene.add(points);
   const pv = Array.from({ length: PMAX }, () => ({ life: 0, max: 0, vx: 0, vy: 0, vz: 0, c: new THREE.Color(), g: 1 }));
@@ -440,10 +454,30 @@ export function createScene(canvas, { mobile = false } = {}) {
       p.life = 0; p.max = 0.5 + Math.random() * 0.5; p.g = gravity;
       const a = Math.random() * TAU, s = spread * (0.4 + Math.random() * 0.6);
       p.vx = Math.cos(a) * s; p.vz = Math.sin(a) * s; p.vy = up * (0.5 + Math.random());
-      p.c.set(colors[k % colors.length]);
+      p.c.set(colors[k % colors.length]); pSize[i] = 1;
       pPos[i * 3] = pos.x; pPos[i * 3 + 1] = pos.y; pPos[i * 3 + 2] = pos.z;
     }
   }
+  /** One particle with its own lifetime (fireworks and drifting ash outlive a burst's sparks). */
+  function spark(x, y, z, vx, vy, vz, color, life, gravity, size = 1) {
+    const i = pNext; pNext = (pNext + 1) % PMAX;
+    const p = pv[i];
+    p.life = 0; p.max = life; p.g = gravity; p.vx = vx; p.vy = vy; p.vz = vz; p.c.set(color); pSize[i] = size;
+    pPos[i * 3] = x; pPos[i * 3 + 1] = y; pPos[i * 3 + 2] = z;
+  }
+  /** A firework shell: a sphere of sparks that hangs, drifts down and fades (plus a white core). */
+  function shell(pos, colors, count = 90, speed = 4.4) {
+    for (let k = 0; k < count; k++) {
+      const z = Math.random() * 2 - 1, a = Math.random() * TAU, r = Math.sqrt(1 - z * z), s = speed * (0.82 + Math.random() * 0.18);
+      spark(pos.x, pos.y, pos.z, Math.cos(a) * r * s, z * s + 0.6, Math.sin(a) * r * s, colors[k % colors.length], 1.1 + Math.random() * 0.8, 0.14, 2.6 + Math.random() * 1.2);
+    }
+    for (let k = 0; k < 14; k++) spark(pos.x, pos.y, pos.z, (Math.random() - 0.5) * 1.2, (Math.random() - 0.5) * 1.2, (Math.random() - 0.5) * 1.2, '#ffffff', 0.35, 0, 6);
+  }
+  // a firework's flash lights up the board for a moment
+  const flash = new THREE.PointLight('#ffffff', 0, 30, 1.6);
+  scene.add(flash);
+  let flashE = 0;
+
   function stepParticles(dt) {
     for (let i = 0; i < PMAX; i++) {
       const p = pv[i];
@@ -456,6 +490,7 @@ export function createScene(canvas, { mobile = false } = {}) {
     }
     pGeo.attributes.position.needsUpdate = true;
     pGeo.attributes.color.needsUpdate = true;
+    pGeo.attributes.aSize.needsUpdate = true;
   }
 
   // ---------------------------------------------------------------- animation helpers
@@ -700,6 +735,66 @@ export function createScene(canvas, { mobile = false } = {}) {
     });
   }
 
+  // ---------------------------------------------------------------- the finale
+  // kind: 'win' (the winning side celebrates with fireworks; for vs-computer this means you won),
+  // 'lose' (you lost: your side's lights go out one by one, its pieces slump, ash drifts down) or
+  // 'draw'. Resolves when the show has had its moment; the caller can cut it short.
+  let fin = null;
+  const FIRE = [['#ff7bd5', '#ffd36b', '#8fe9ff', '#c39bff', '#ffffff'], ['#4be36a', '#b6ffbf', '#ffe98a', '#ffffff']];
+  function finale(kind, winnerSide, sfx = {}) {
+    const t0 = clockT, myGen = gen;
+    const winT = sideType(winnerSide), loseT = sideType(1 - winnerSide);
+    const look = new THREE.Vector3(); let cnt = 0;
+    const focusT = kind === 'lose' ? loseT : winT;
+    actors.forEach((a, i) => { if (a.type === focusT) { look.add(cells[i].pos); cnt++; } });
+    cnt ? look.divideScalar(cnt).multiplyScalar(0.5) : look.set(0, 0, 0);
+    fin = { kind, t0, yaw0: camAzimuth, look, winT, loseT };
+    startBlend(kind === 'lose' ? 2.4 : 1.8);
+    swarm.celebrate(look, clockT);
+    const own = (t) => actors.map((a, i) => (a.type === t ? i : -1)).filter((i) => i >= 0);
+    const winners = own(winT), losers = kind === 'draw' ? [] : own(loseT);
+    const go = (secs, fn) => later(secs, () => { if (gen === myGen) fn(); });
+
+    // the winners hop in waves rippling out from the middle, then keep bouncing
+    const waves = kind === 'lose' ? [0.4] : [0.35, 1.45, 2.55];
+    const hoppers = kind === 'draw' ? [...winners, ...own(loseT)] : winners;
+    hoppers.forEach((i) => {
+      const a = actors[i], d = cells[i].pos.distanceTo(look);
+      a.cheer = t0 + 0.3; a.cheerFor = kind === 'lose' ? 2.4 : 6;
+      waves.forEach((w) => go(w + d * 0.07, () => { a.hopAt = clockT; }));
+    });
+    // the losers' lights go out one after another, and they sag
+    [...losers].sort(() => Math.random() - 0.5).forEach((i, k) => { actors[i].slumpAt = t0 + 0.5 + k * Math.min(0.09, 1.6 / losers.length); });
+
+    if (kind === 'lose') {
+      // ash drifts down through the dimmed light
+      const R = Math.max(...cells.map((c) => c.pos.length()));
+      for (let k = 0; k < 70; k++) go(0.3 + k * 0.05, () => {
+        const a = Math.random() * TAU, r = Math.sqrt(Math.random()) * R;
+        spark(Math.cos(a) * r, 4 + Math.random() * 3, Math.sin(a) * r, (Math.random() - 0.5) * 0.3, -0.5 - Math.random() * 0.4, (Math.random() - 0.5) * 0.3,
+          Math.random() < 0.5 ? '#5b6580' : '#7a6a5e', 3 + Math.random(), 0.02, 1.8);
+      });
+      return pause(3.4);
+    }
+
+    // fireworks: rockets climb from the winners' pieces and burst overhead, ending in a barrage
+    const pal = kind === 'draw' ? [...FIRE[0].slice(0, 2), ...FIRE[1].slice(0, 2), '#ffffff'] : FIRE[winnerSide];
+    const times = kind === 'draw' ? [0.6, 1.3, 2.0, 2.7] : [0.5, 0.78, 1.05, 1.6, 1.85, 2.2, 2.6, 3.05, 3.12, 3.2, 3.28];
+    const from = kind === 'draw' ? [...winners, ...own(loseT)] : winners;
+    times.forEach((tm, k) => go(tm, () => {
+      const at = from.length ? cells[from[(Math.random() * from.length) | 0]].pos : cells[(Math.random() * n) | 0].pos;
+      const h = 2.6 + Math.random() * 1.6, rise = 0.55 + Math.random() * 0.15;
+      const c1 = pal[k % pal.length], c2 = pal[(k + 2) % pal.length];
+      const p = fx.rocket(at, c1, rise, h); sfx.effect?.('launch');
+      go(rise, () => {
+        shell(p, [c1, c1, c2, '#ffffff'], k >= times.length - 4 ? 110 : 85, 3.8 + Math.random() * 1.4);
+        flash.position.copy(p); flash.color.set(c1); flashE = Math.max(flashE, 1);
+        trauma = Math.min(1, trauma + 0.06); sfx.effect?.('pop');
+      });
+    }));
+    return pause(kind === 'draw' ? 3.6 : 4.4);
+  }
+
   // ---------------------------------------------------------------- per-frame
   const M = new THREE.Matrix4(), M2 = new THREE.Matrix4(), Q = new THREE.Quaternion(), P = new THREE.Vector3(), SC = new THREE.Vector3(), E = new THREE.Euler();
   const AX_Y = new THREE.Vector3(0, 1, 0);
@@ -756,6 +851,14 @@ export function createScene(canvas, { mobile = false } = {}) {
         if (owner === RUBY) glowTarget[i].copy(COLORS.rubyGlow); else if (owner === SAPPHIRE) glowTarget[i].copy(COLORS.sapphireGlow); else glowTarget[i].setRGB(0, 0, 0);
         glowTarget[i].multiplyScalar(glowOn * (0.85 + 0.15 * Math.sin(t * 1.6 + i * 0.7))); // a slow shimmer
         if (i === sel) glowTarget[i].setRGB(0.7, 0.75, 0.9);
+        if (fin) {
+          // finale: light rings pulse outwards through the winners' cells; the losers' cells go dark
+          if (a.slumpAt !== undefined) glowTarget[i].multiplyScalar(1 - 0.85 * clamp01((t - a.slumpAt) / 0.5));
+          else if (owner && (owner === fin.winT || fin.kind === 'draw') && fin.kind !== 'lose') {
+            const ph = (t - fin.t0) * 4.5 - cells[i].pos.distanceTo(fin.look) * 0.8;
+            if (ph > 0 && ph < 6 * Math.PI) glowTarget[i].multiplyScalar(1 + 1.4 * Math.pow(Math.max(0, Math.sin(ph)), 6));
+          }
+        }
         cellCol[i].lerp(cellTarget[i], Math.min(1, rdt * 5));
         glowCol[i].lerp(glowTarget[i], Math.min(1, rdt * 5));
         meshes.cells.setColorAt(i, cellCol[i]);
@@ -797,7 +900,8 @@ export function createScene(canvas, { mobile = false } = {}) {
         const selected = i === sel;
         a.lift += ((selected ? 0.38 : 0) - a.lift) * Math.min(1, rdt * 10);
         const thinkingSide = thinking >= 0 && sideType(thinking) === a.type;
-        const cheering = a.cheer && t - a.cheer < 2.2;
+        const cheering = a.cheer && t > a.cheer && t - a.cheer < (a.cheerFor || 2.2);
+        const slump = a.slumpAt !== undefined ? ease(clamp01((t - a.slumpAt) / 0.9)) : 0;
         // scripted takeover moves: implode (crush to a point), spin (whirl up), levitate (rise and hang)
         if (a.anim && t >= a.anim.t0) {
           const u = clamp01((t - a.anim.t0) / a.anim.dur), k = a.anim.kind;
@@ -823,14 +927,15 @@ export function createScene(canvas, { mobile = false } = {}) {
           if (a.jolt) { j.jolt(a.jolt); a.jolt = 0; }                                          // struck by an effect
           if ((selected || cheering) && t - (a.lastBounce || 0) > (cheering ? 0.45 : 0.62)) { j.poke(0, selected ? 2.3 : 2.8, 0); a.lastBounce = t; }
           if (Math.random() < dt * (thinkingSide ? 1.2 : 0.12)) j.jolt(thinkingSide ? 0.9 : 0.5); // idle quivers
+          if (slump > 0 && !a.slumped) { j.poke(0, -2.4, 0); a.slumped = true; } // deflates
           j.step(dt, P.set(c.x, 0, c.z));
-          j.matrix(M, a.scale * GEM_SIZE);
+          j.matrix(M, a.scale * GEM_SIZE * (1 - 0.22 * slump));
           meshes.sapphire.setMatrixAt(ns++, M);
           continue;
         }
         if (a.type !== SAPPHIRE) a.jelly = null;
         if (a.jolt) { a.hopAt = t; a.jolt = 0; }
-        a.yaw += dt * (selected ? 2.6 : thinkingSide ? 1.4 : 0.45);
+        a.yaw += dt * (selected ? 2.6 : thinkingSide ? 1.4 : 0.45) * (1 - slump);
         const hopU = clamp01((t - a.hopAt) / 0.42);
         const hop = hopU < 1 ? Math.sin(hopU * Math.PI) * 0.4 : 0;
         const cheer = cheering ? Math.abs(Math.sin((t - a.cheer) * 9 + a.phase)) * 0.25 : 0;
@@ -838,7 +943,8 @@ export function createScene(canvas, { mobile = false } = {}) {
         const tumble = spin < 1 ? ease(spin) * TAU : 0;
         // a shard caught in goo sinks into it
         const melt = a.meltAt !== undefined ? clamp01((t - a.meltAt) / 0.33) : 0;
-        gemMatrix(M, c.x, hover + a.lift + hop + cheer - melt * 0.35, c.z, a.yaw, tumble, a.scale * (1 - melt * 0.7));
+        // a beaten shard stops turning, sinks and keels over
+        gemMatrix(M, c.x, (hover + a.lift + hop + cheer) * (1 - slump) - melt * 0.35 - slump * 0.12, c.z, a.yaw, tumble + slump * 0.55 * Math.sin(a.phase * 5 + 1), a.scale * (1 - melt * 0.7) * (1 - 0.14 * slump));
         if (a.type === RUBY) meshes.ruby.setMatrixAt(nr++, M); else meshes.sapphire.setMatrixAt(ns++, M);
       }
       // gems in flight
@@ -865,8 +971,12 @@ export function createScene(canvas, { mobile = false } = {}) {
     // keep the sharp band on the board
     (cine ? tmpV.copy(cine.at) : tmpV.set(0, 0, 0)).project(camera);
     tiltH.uniforms.uFocus.value = tiltV.uniforms.uFocus.value = (tmpV.y + 1) / 2;
-    // a shallower depth of field during a takedown
-    const band = cine ? 0.1 : 0.2; tiltH.uniforms.uBand.value += (band - tiltH.uniforms.uBand.value) * Math.min(1, rdt * 4); tiltV.uniforms.uBand.value = tiltH.uniforms.uBand.value;
+    // finale: firework flashes fade; the light falls on a loss
+    flashE = Math.max(0, flashE - rdt * 2.6); flash.intensity = flashE * flashE * 140;
+    const sunT = fin?.kind === 'lose' ? SUN0 * 0.5 : SUN0;
+    sun.intensity += (sunT - sun.intensity) * Math.min(1, rdt * 1.2);
+    // a shallower depth of field during a takedown, a deeper one for the fireworks
+    const band = cine ? 0.1 : fin && fin.kind !== 'lose' ? 0.45 : 0.2; tiltH.uniforms.uBand.value += (band - tiltH.uniforms.uBand.value) * Math.min(1, rdt * 4); tiltV.uniforms.uBand.value = tiltH.uniforms.uBand.value;
     composer.render();
   }
   const loop = (now) => { update(now); requestAnimationFrame(loop); };
@@ -879,6 +989,7 @@ export function createScene(canvas, { mobile = false } = {}) {
     pick,
     playMove,
     celebrate,
+    finale,
     /** Highlight a piece and its targets ([{to, fly}]). */
     select(i, list) { sel = i; targets = list || []; selectedAt = clockT; if (i >= 0) actors[i].hopAt = clockT; },
     clearSelect() { sel = -1; targets = []; },

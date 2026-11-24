@@ -188,6 +188,36 @@
   #result .stat { flex: 1; max-width: 120px; padding: 8px 6px; border-radius: 14px; background: rgba(255, 255, 255, .05); border: 1px solid var(--edge); text-align: center; opacity: 0; transform: translateY(10px); }
   #result .stat.in { animation: rise .5s cubic-bezier(.2, .9, .3, 1) forwards; }
   #result .stat b { display: block; font-size: 22px; } #result .stat small { font-size: 11px; font-weight: 800; color: var(--ink-2); text-transform: uppercase; letter-spacing: .08em; }
+  /* the finale: a big title over the celebration (or the defeat), before the results */
+  #finale { position: fixed; inset: 0; z-index: 7; pointer-events: none; display: none; place-items: center; overflow: hidden; transition: opacity .35s, transform .35s; }
+  #finale.win, #finale.lose, #finale.draw { display: grid; }
+  #finale.out { opacity: 0; transform: scale(1.06); }
+  #finale .wrap { position: relative; text-align: center; transform: translateY(-21vh); }
+  #hud > * { transition: opacity .5s; }
+  body.finale #hud > * { opacity: 0; pointer-events: none; }
+  #finale-title { font-family: 'Unbounded', sans-serif; font-weight: 700; font-size: clamp(40px, 12.5vw, 112px); line-height: 1; letter-spacing: -.02em; white-space: nowrap; }
+  #finale-title span { display: inline-block; opacity: 0; animation: letterIn .7s cubic-bezier(.2, 1.5, .4, 1) forwards; animation-delay: calc(.35s + var(--k) * 70ms); }
+  @keyframes letterIn { 0% { opacity: 0; transform: translateY(-60%) scale(1.8) rotate(-8deg); filter: blur(6px); } 100% { opacity: 1; transform: none; filter: none; } }
+  #finale-score { margin-top: 10px; font-family: 'Unbounded', sans-serif; font-weight: 500; font-size: clamp(16px, 4vw, 24px); letter-spacing: .12em; opacity: 0; animation: rise .6s ease 1.1s forwards; transform: translateY(8px); text-shadow: 0 2px 10px rgba(0, 0, 0, .8); }
+  #finale-tap { position: absolute; left: 0; right: 0; bottom: 11vh; text-align: center; font-size: 13px; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; color: rgba(230, 236, 255, .55); opacity: 0; animation: tapIn 1.6s ease 1.8s infinite alternate; }
+  @keyframes tapIn { from { opacity: 0; } to { opacity: 1; } }
+  /* win: gold letters with a glint, under slowly turning rays of light */
+  #finale.win #finale-title span { color: #ffe39a; background: linear-gradient(180deg, #fff6d6 0%, #ffd36b 45%, #f0a43a 100%); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+  #finale.win #finale-title { filter: drop-shadow(0 0 22px rgba(255, 196, 90, .65)) drop-shadow(0 4px 0 rgba(90, 40, 0, .55)); }
+  #finale.win #finale-score { color: #fff1c8; text-shadow: 0 0 14px rgba(255, 200, 100, .6), 0 2px 8px rgba(0, 0, 0, .9); }
+  #finale.win::before { content: ''; position: absolute; left: 50%; top: 36%; width: 160vmax; height: 160vmax; margin: -80vmax 0 0 -80vmax;
+    background: repeating-conic-gradient(from 0deg, rgba(255, 220, 150, .13) 0 5deg, transparent 5deg 15deg);
+    -webkit-mask: radial-gradient(circle, #000 0, transparent 38%); mask: radial-gradient(circle, #000 0, transparent 38%);
+    opacity: 0; animation: raysIn 1.2s ease .3s forwards, spin 40s linear infinite; }
+  @keyframes raysIn { to { opacity: 1; } }
+  /* draw: cool silver */
+  #finale.draw #finale-title span { color: #e6ecff; text-shadow: 0 0 20px rgba(170, 200, 255, .6), 0 4px 0 rgba(0, 0, 0, .5); }
+  #finale.draw #finale-score { color: #dfe6ff; }
+  /* lose: grey letters that settle slowly, under a closing vignette */
+  #finale.lose #finale-title span { color: #8d96b2; text-shadow: 0 4px 0 rgba(0, 0, 0, .6); animation: letterFall 1.2s cubic-bezier(.3, .7, .2, 1) forwards; animation-delay: calc(.5s + var(--k) * 110ms); }
+  @keyframes letterFall { 0% { opacity: 0; transform: translateY(-30px); filter: blur(4px); } 100% { opacity: 1; transform: none; filter: none; } }
+  #finale.lose #finale-score { color: #8d96b2; }
+  #finale.lose::before { content: ''; position: absolute; inset: 0; background: radial-gradient(ellipse at 50% 55%, transparent 30%, rgba(2, 3, 10, .7) 100%); opacity: 0; animation: raysIn 2.2s ease forwards; }
   @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; } }
   #toast { position: fixed; left: 50%; top: 42%; transform: translate(-50%, -50%); background: rgba(10, 12, 26, .9); border: 1px solid var(--edge); color: #fff; padding: 10px 18px; border-radius: 14px; font-weight: 700; z-index: 20; pointer-events: none; transition: opacity .3s; text-align: center; }
 </style>
@@ -213,6 +243,7 @@
 <div id="boot"><div><svg class="mark" viewBox="0 0 40 40"><use href="#i-bee"/></svg><div class="bar"><i></i></div></div></div>
 <div id="badges"></div>
 <div id="callouts"></div>
+<div id="finale" aria-live="polite"><div class="wrap"><div id="finale-title"></div><div id="finale-score"></div></div><div id="finale-tap">Tap to continue</div></div>
 <div id="bars" class="bars"></div>
 
 <section id="title" class="layer">

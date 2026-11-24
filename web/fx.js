@@ -254,7 +254,7 @@ export function createFx(scene, { mobile = false } = {}) {
 
   // ---------------------------------------------------------- firework rocket
   /** A rocket climbs from a piece, trailing sparks, to burst overhead (the caller adds the burst). */
-  function rocket(at, color, dur = 0.45) {
+  function rocket(at, color, dur = 0.45, height = 2.4) {
     const g = new THREE.Group();
     g.add(new THREE.Mesh(new THREE.SphereGeometry(0.07, 10, 8), new THREE.MeshBasicMaterial({ color: '#ffffff', toneMapped: false })));
     const tail = new THREE.Mesh((() => { const t = new THREE.ConeGeometry(0.07, 0.8, 8, 1, true); t.translate(0, -0.4, 0); return t; })(), glowMat(color));
@@ -264,11 +264,12 @@ export function createFx(scene, { mobile = false } = {}) {
     items.push((dt) => {
       life += dt;
       const u = Math.min(1, life / dur), e = 1 - (1 - u) * (1 - u);
-      g.position.set(at.x + sway * u, 0.4 + e * 2.4, at.z);
+      g.position.set(at.x + sway * u, 0.4 + e * height, at.z);
       tail.scale.set(1, 0.4 + (1 - u) * 1.2, 1);
       if (u >= 1) { dispose(g); return false; }
       return true;
     });
+    return new THREE.Vector3(at.x + sway, 0.4 + height, at.z); // where it bursts
   }
 
   function update(dt) {
